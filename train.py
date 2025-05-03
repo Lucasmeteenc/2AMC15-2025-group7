@@ -6,6 +6,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import trange
 
+from agents.vi_agent import ViAgent
+
 try:
     from world import Environment
     from agents.random_agent import RandomAgent
@@ -40,6 +42,35 @@ def parse_args():
     return p.parse_args()
 
 
+@staticmethod
+def _neutral_reward_function(grid, agent_pos) -> float:
+    """This is a very simple reward function.
+
+    Args:
+        grid: The grid the agent is moving on, in case that is needed by
+            the reward function.
+        agent_pos: The position the agent is moving to.
+
+    Returns:
+        A single floating point value representing the reward for a given
+        action.
+    """
+
+    match grid[agent_pos]:
+        case 0:  # Moved to an empty tile
+            reward = -1
+        case 1 | 2:  # Moved to a wall or obstacle
+            reward = -5
+            pass
+        case 3:  # Moved to a target tile
+            reward = 10
+            # "Illegal move"
+        case _:
+            raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
+                            f"at position {agent_pos}")
+    return reward
+
+
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
          sigma: float, random_seed: int):
     """Main loop of the program."""
@@ -47,11 +78,12 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
     for grid in grid_paths:
         
         # Set up the environment
-        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, 
+        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, reward_fn=_neutral_reward_function,
                           random_seed=random_seed)
         
+        env.reset()
         # Initialize agent
-        agent = RandomAgent()
+        agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid)
         
         # Always reset the environment to initial state
         state = env.reset()
