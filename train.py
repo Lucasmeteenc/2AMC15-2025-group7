@@ -1,7 +1,7 @@
 """
 Train your RL Agent in this file. 
 """
-
+import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import trange
@@ -44,7 +44,7 @@ def parse_args():
 
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int, nEpisodes: int = 1000):
+         sigma: float, random_seed: int, nEpisodes: int = 10_000):
     """Main loop of the program."""
 
     for grid in grid_paths:
@@ -59,8 +59,9 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         # Initialize agent
         agent = QLearningAgent(env.grid, gamma=0.9)
         
-        for _ in range(nEpisodes):
+        for episode in range(nEpisodes):
             state = env.reset()
+            agent.decay_learning_params(nEpisodes,episode)
             for _ in trange(iters):
                 
                 # Agent takes an action based on the latest observation and info.
@@ -74,7 +75,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     break
 
                 agent.update(state, reward, info["actual_action"])
-
+        print(f"{np.argmax(agent.Q_table, axis=2)=}")
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
 

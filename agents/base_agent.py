@@ -16,7 +16,7 @@ class BaseAgent(ABC):
         """
 
     @abstractmethod
-    def take_action(self, state: tuple[int, int]) -> int:
+    def take_action(self, state: tuple[int, int], evaluate: bool) -> int:
         """Any code that does the action should be included here.
 
         Args:
@@ -24,6 +24,9 @@ class BaseAgent(ABC):
         """
         raise NotImplementedError
     
+    def decay_learning_params(self, nEpisodes: int, episode: int):
+        pass
+
     @abstractmethod
     def update(self, state: tuple[int, int], reward: float, action: int):
         """Any code that processes a reward given the state and updates the agent.

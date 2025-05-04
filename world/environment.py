@@ -339,7 +339,7 @@ class Environment:
             grid_fp: Path to the grid file to use.
             agent: Trained agent to evaluate.
             max_steps: Max number of steps to take.
-            sigma: same as abve.
+            sigma: same as above.
             agent_start_pos: same as above.
             random_seed: same as above.
             show_images: Whether to show the images at the end of the
@@ -361,7 +361,7 @@ class Environment:
 
         for _ in trange(max_steps, desc="Evaluating agent"):
             
-            action = agent.take_action(state)
+            action = agent.take_action(state, evaluate=True)
             state, _, terminated, _ = env.step(action)
 
             agent_path.append(state)
@@ -370,7 +370,6 @@ class Environment:
                 break
 
         env.world_stats["targets_remaining"] = np.sum(env.grid == 3)
-
         path_image = visualize_path(initial_grid, agent_path)
         file_name = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
 

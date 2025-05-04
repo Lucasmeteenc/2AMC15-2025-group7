@@ -24,10 +24,14 @@ class QLearningAgent(BaseAgent):
         self.gamma = gamma
 
         self.alpha = 0.1
-        self.epsilon = 0.3
+        self.epsilon = 1.0
 
         self.old_state = None
-        
+
+    def decay_learning_params(self, nEpisodes: int, episode: int):
+        if episode > 0.3*nEpisodes:
+            self.alpha = self.alpha * 0.9995      #initial_alpha / (1 + i / 1000)
+            self.epsilon = self.epsilon * 0.999  #max(min_epsilon, initial_epsilon * np.exp(-i / decay_rate))
 
     """Agent that performs a random action every time. """
     def update(self, state: tuple[int, int], reward: float, action):
@@ -48,7 +52,7 @@ class QLearningAgent(BaseAgent):
         self.Q_table[self.old_state[0], self.old_state[1], action] = self.Q_table[self.old_state[0], self.old_state[1], action] + self.alpha * TD_error
 
 
-    def take_action(self, state: tuple[int, int]) -> int:
+    def take_action(self, state: tuple[int, int], evaluate: bool = False) -> int:
         """Any code that does the action should be included here.
 
         Args:
@@ -57,8 +61,7 @@ class QLearningAgent(BaseAgent):
         self.old_state = state
 
         # Epsilon greedy
-        if np.random.random() < self.epsilon:
-            return np.random.randint(self.nr_actions)
-        else:
+        if evaluate or np.random.random() > self.epsilon:
             return np.argmax(self.Q_table[state[0], state[1]])
-        
+        else:
+            return np.random.randint(self.nr_actions)
