@@ -6,9 +6,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import trange
 
+import numpy as np
+
 try:
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.mc_agent import MonteCarloAgent
 except ModuleNotFoundError:
     from os import path
     from os import pardir
@@ -20,59 +23,117 @@ except ModuleNotFoundError:
         sys.path.extend(root_path)
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.mc_agent import MonteCarloAgent
 
 def parse_args():
-    p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
+    p = ArgumentParser(description="DIC Reinforcement Learning Trainer - Monte Carlo.")
     p.add_argument("GRID", type=Path, nargs="+",
-                   help="Paths to the grid file to use. There can be more than "
-                        "one.")
+                   help="Paths to the grid file to use.")
     p.add_argument("--no_gui", action="store_true",
                    help="Disables rendering to train faster")
     p.add_argument("--sigma", type=float, default=0.1,
                    help="Sigma value for the stochasticity of the environment.")
-    p.add_argument("--fps", type=int, default=30,
-                   help="Frames per second to render at. Only used if "
-                        "no_gui is not set.")
-    p.add_argument("--iter", type=int, default=1000,
-                   help="Number of iterations to go through.")
+    p.add_argument("--fps", type=int, default=300,
+                   help="Frames per second (only if GUI enabled).")
+    p.add_argument("--num_episodes", type=int, default=100,
+                   help="Number of episodes to train for.")
+    p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
+                   help="Maximum steps allowed per episode.")
+    p.add_argument("--gamma", type=float, default=0.99, # Discount factor
+                   help="Discount factor gamma.")
+    p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
+                   help="Initial exploration rate epsilon.")
+    p.add_argument("--min_epsilon", type=float, default=0.05, # Minimum Epsilon
+                   help="Minimum exploration rate epsilon.")
+    p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
+                   help="Epsilon decay rate per episode.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
     return p.parse_args()
 
 
-def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int):
-    """Main loop of the program."""
+def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
+         sigma: float, gamma: float, epsilon: float, min_epsilon: float,
+         epsilon_decay: float, max_steps_per_episode: int, random_seed: int):
+    """Main loop for Monte Carlo Training."""
 
-    for grid in grid_paths:
-        
+    for grid_path in grid_paths:
+        print(f"\n--- Training on Grid: {grid_path.name} ---")
+
         # Set up the environment
-        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, 
+        env = Environment(grid_path, no_gui=no_gui, sigma=sigma, target_fps=fps,
                           random_seed=random_seed)
         
+        _ = env.reset() # Call reset once to load the grid
+        grid_shape = env.grid.shape
+        num_actions = 4
+
         # Initialize agent
-        agent = RandomAgent()
+        agent = MonteCarloAgent(grid_shape=grid_shape,
+                                num_actions=num_actions,
+                                gamma=gamma,
+                                initial_epsilon=epsilon,
+                                min_epsilon=min_epsilon,
+                                epsilon_decay=epsilon_decay)
         
-        # Always reset the environment to initial state
-        state = env.reset()
-        for _ in trange(iters):
-            
-            # Agent takes an action based on the latest observation and info.
-            action = agent.take_action(state)
+        old_policy = np.zeros((grid_shape[0], grid_shape[1]), dtype=np.int32)
+        same_policy_count = 0
 
-            # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
-            
-            # If the final state is reached, stop.
-            if terminated:
-                break
+        # Main Training Loop (Episodes)
+        for episode in trange(num_episodes, desc=f"Training on {grid_path.name}"):
+            state = env.reset()
+            terminated = False
+            steps_in_episode = 0
 
-            agent.update(state, reward, info["actual_action"])
+            # Generate One Episode
+            while not terminated and steps_in_episode < max_steps_per_episode:
+                # Agent takes an action based on the current state and policy
+                action = agent.take_action(state)
 
-        # Evaluate the agent
-        Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
+                # The action is performed in the environment
+                next_state, reward, terminated, info = env.step(action)
 
+                # Store the experience for this step
+                agent.update(state, reward, action)
+
+                # Move to the next state
+                state = next_state
+                steps_in_episode += 1
+
+            # Episode Finished: Update Q-values
+            agent.update_q_from_episode()
+
+            # Decay Epsilon
+            agent.update_epsilon()
+
+            # Early Stopping
+            new_policy = agent.get_policy()
+            if np.array_equal(new_policy, old_policy):
+                same_policy_count += 1
+                if same_policy_count >= 50:
+                    print(f"Policy converged after {episode} episodes.")
+                    break
+            else:
+                same_policy_count = 0
+
+            old_policy = new_policy.copy()
+
+        print(f"\n--- Training completed for {grid_path.name} ---")
+        
+        # Evaluate the final policy
+        eval_agent = MonteCarloAgent(grid_shape=grid_shape, num_actions=num_actions, gamma=gamma)
+        eval_agent.Q = agent.Q # Copy the learned Q-values
+        eval_agent.epsilon = 0 # Greedy policy for evaluation
+
+        print(f"Evaluating agent on {grid_path.name}...")
+        Environment.evaluate_agent(grid_path,
+                                   eval_agent, # Use the greedy evaluation agent
+                                   max_steps=max_steps_per_episode * 2, # Allow more steps for eval
+                                   sigma=0, # Evaluate deterministically
+                                   random_seed=random_seed)
 
 if __name__ == '__main__':
     args = parse_args()
-    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed)
+    main(args.GRID, args.no_gui, args.num_episodes, args.fps, args.sigma,
+         args.gamma, args.epsilon, args.min_epsilon, args.epsilon_decay,
+         args.max_steps_per_episode, args.random_seed)
