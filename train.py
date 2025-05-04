@@ -9,6 +9,8 @@ from tqdm import trange
 try:
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.q_learning_agent import QLearningAgent
+
 except ModuleNotFoundError:
     from os import path
     from os import pardir
@@ -20,6 +22,7 @@ except ModuleNotFoundError:
         sys.path.extend(root_path)
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.q_learning_agent import QLearningAgent
 
 def parse_args():
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
@@ -41,7 +44,7 @@ def parse_args():
 
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int):
+         sigma: float, random_seed: int, nEpisodes: int = 1000):
     """Main loop of the program."""
 
     for grid in grid_paths:
@@ -50,24 +53,27 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, 
                           random_seed=random_seed)
         
-        # Initialize agent
-        agent = RandomAgent()
-        
         # Always reset the environment to initial state
         state = env.reset()
-        for _ in trange(iters):
-            
-            # Agent takes an action based on the latest observation and info.
-            action = agent.take_action(state)
 
-            # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
-            
-            # If the final state is reached, stop.
-            if terminated:
-                break
+        # Initialize agent
+        agent = QLearningAgent(env.grid, gamma=0.9)
+        
+        for _ in range(nEpisodes):
+            state = env.reset()
+            for _ in trange(iters):
+                
+                # Agent takes an action based on the latest observation and info.
+                action = agent.take_action(state)
 
-            agent.update(state, reward, info["actual_action"])
+                # The action is performed in the environment
+                state, reward, terminated, info = env.step(action)
+                
+                # If the final state is reached, stop.
+                if terminated:
+                    break
+
+                agent.update(state, reward, info["actual_action"])
 
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
