@@ -35,7 +35,7 @@ def parse_args():
                    help="Sigma value for the stochasticity of the environment.")
     p.add_argument("--fps", type=int, default=300,
                    help="Frames per second (only if GUI enabled).")
-    p.add_argument("--num_episodes", type=int, default=100,
+    p.add_argument("--num_episodes", type=int, default=5000,
                    help="Number of episodes to train for.")
     p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
                    help="Maximum steps allowed per episode.")
@@ -47,6 +47,8 @@ def parse_args():
                    help="Minimum exploration rate epsilon.")
     p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
                    help="Epsilon decay rate per episode.")
+    p.add_argument("--early_stopping_patience", type=int, default=250,
+                   help="Amount of episodes with the same policy that triggers early stopping.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
     return p.parse_args()
@@ -54,7 +56,8 @@ def parse_args():
 
 def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
          sigma: float, gamma: float, epsilon: float, min_epsilon: float,
-         epsilon_decay: float, max_steps_per_episode: int, random_seed: int):
+         epsilon_decay: float, max_steps_per_episode: int, random_seed: int,
+         early_stopping_patience: int):
     """Main loop for Monte Carlo Training."""
 
     for grid_path in grid_paths:
@@ -66,6 +69,7 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
         
         _ = env.reset() # Call reset once to load the grid
         grid_shape = env.grid.shape
+        init_grid = np.copy(env.grid)
         num_actions = 4
 
         # Initialize agent
@@ -84,6 +88,7 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
             state = env.reset()
             terminated = False
             steps_in_episode = 0
+            agent.episode_experience = []
 
             # Generate One Episode
             while not terminated and steps_in_episode < max_steps_per_episode:
@@ -110,7 +115,7 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
             new_policy = agent.get_policy()
             if np.array_equal(new_policy, old_policy):
                 same_policy_count += 1
-                if same_policy_count >= 50:
+                if same_policy_count >= early_stopping_patience:
                     print(f"Policy converged after {episode} episodes.")
                     break
             else:
@@ -125,6 +130,8 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
         eval_agent.Q = agent.Q # Copy the learned Q-values
         eval_agent.epsilon = 0 # Greedy policy for evaluation
 
+        eval_agent.print_policy(init_grid)
+
         print(f"Evaluating agent on {grid_path.name}...")
         Environment.evaluate_agent(grid_path,
                                    eval_agent, # Use the greedy evaluation agent
@@ -136,4 +143,4 @@ if __name__ == '__main__':
     args = parse_args()
     main(args.GRID, args.no_gui, args.num_episodes, args.fps, args.sigma,
          args.gamma, args.epsilon, args.min_epsilon, args.epsilon_decay,
-         args.max_steps_per_episode, args.random_seed)
+         args.max_steps_per_episode, args.random_seed, args.early_stopping_patience)

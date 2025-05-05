@@ -54,7 +54,6 @@ class MonteCarloAgent(BaseAgent):
     def update(self, state, reward, action):
         self.episode_experience.append((state, reward, action))
 
-    # Helper function for the main training loop
     def update_q_from_episode(self):
         """
         Update Q-values and visit counts based on a completed episode.
@@ -78,14 +77,12 @@ class MonteCarloAgent(BaseAgent):
             # Every Visit MC Update
             self.N_visits[row, col, action] += 1
             
-            alpha = 1.0 / self.N_visits[row, col, action]
-            # alpha = (1 / (1 + self.N_visits[row, col, action]))**0.5
-
+            alpha = 1.0 / (self.N_visits[row, col, action]**0.5)
+            
             # Update Q-value
             current_q = self.Q[row, col, action]
             self.Q[row, col, action] = current_q + alpha * (G - current_q)
 
-    # Helper function to extract the policy
     def get_policy(self):
         """
         Extract the policy from the Q-table.
@@ -94,3 +91,39 @@ class MonteCarloAgent(BaseAgent):
             np.ndarray: The policy (best action for each state).
         """
         return np.argmax(self.Q, axis=2)
+    
+    def print_policy(self, init_grid):
+        """
+        Print the policy in a human-readable format.
+        """
+        print("\nPolicy (best action for each state):")
+        found_policy = self.get_policy()
+        H, W = found_policy.shape
+
+        action_symbols = {0: 'v', 1: '^', 2: '<', 3: '>'}
+        wall_symbol = '#'
+
+        WALL_VALUE = 1
+        OBSTACLE_VALUE = 2
+        TARGET_VALUE = 3
+
+        print("-" * (H * 2 + 1))
+
+        # Print the transposed policy row by row
+        for r_vis in range(W):
+            row_str = "|"
+            for c_vis in range(H):
+                original_row = c_vis
+                original_col = r_vis
+
+                if init_grid[original_row, original_col] == WALL_VALUE or init_grid[original_row, original_col] == OBSTACLE_VALUE:
+                    row_str += wall_symbol + " "
+                elif init_grid[original_row, original_col] == TARGET_VALUE:
+                    row_str += "T" + " "
+                else:
+                    action = found_policy[original_row, original_col]
+                    row_str += action_symbols.get(action, '?') + " "
+            row_str += "|"
+            print(row_str)
+
+        print("-" * (H * 2 + 1))
