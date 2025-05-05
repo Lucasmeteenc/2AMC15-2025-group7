@@ -47,17 +47,27 @@ class MonteCarloAgent(BaseAgent):
             return np.argmax(self.Q[row, col, :])
 
     def update_epsilon(self):
-        """Decay epsilon."""
+        """
+        Update the exploration rate (epsilon) after each episode.
+        """
         if self.epsilon > self.min_epsilon:
             self.epsilon *= self.epsilon_decay
 
     def update(self, state, reward, action):
+        """
+        Use the update call (after each step) to store the experience of the current step in the episode.
+        
+        Args:
+            state (tuple): Current state (row, col).
+            reward (float): Reward received.
+            action (int): Action taken (0-3).
+        """
+
         self.episode_experience.append((state, reward, action))
 
     def update_q_from_episode(self):
         """
         Update Q-values and visit counts based on a completed episode.
-        This should be called from the main training loop in train.py.
 
         Args:
             episode_experience (list): A list of (state, reward, action) tuples for the episode.
@@ -95,12 +105,20 @@ class MonteCarloAgent(BaseAgent):
     def print_policy(self, init_grid):
         """
         Print the policy in a human-readable format.
+
+        Args:
+            init_grid (np.ndarray): The grid environment.
         """
         print("\nPolicy (best action for each state):")
         found_policy = self.get_policy()
         H, W = found_policy.shape
 
-        action_symbols = {0: 'v', 1: '^', 2: '<', 3: '>'}
+        action_symbols = {
+            0: '↓',  # Down
+            1: '↑',  # Up
+            2: '←',  # Left
+            3: '→'   # Right
+        }
         wall_symbol = '#'
 
         WALL_VALUE = 1

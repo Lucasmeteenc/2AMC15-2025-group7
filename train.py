@@ -58,7 +58,23 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
          sigma: float, gamma: float, epsilon: float, min_epsilon: float,
          epsilon_decay: float, max_steps_per_episode: int, random_seed: int,
          early_stopping_patience: int):
-    """Main loop for Monte Carlo Training."""
+    """
+    Main loop for Monte Carlo Training.
+
+    Args:
+        grid_paths (list[Path]): List of paths to the grid files.
+        no_gui (bool): If True, disables GUI rendering.
+        num_episodes (int): Number of episodes to train for.
+        fps (int): Frames per second for GUI rendering.
+        sigma (float): Sigma value for the stochasticity of the environment.
+        gamma (float): Discount factor.
+        epsilon (float): Initial exploration rate.
+        min_epsilon (float): Minimum exploration rate.
+        epsilon_decay (float): Epsilon decay rate per episode.
+        max_steps_per_episode (int): Maximum steps allowed per episode.
+        random_seed (int): Random seed value for the environment.
+        early_stopping_patience (int): Amount of episodes with the same policy that triggers early stopping.
+    """
 
     for grid_path in grid_paths:
         print(f"\n--- Training on Grid: {grid_path.name} ---")
@@ -80,17 +96,18 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
                                 min_epsilon=min_epsilon,
                                 epsilon_decay=epsilon_decay)
         
+        # Initialize variables for early stopping
         old_policy = np.zeros((grid_shape[0], grid_shape[1]), dtype=np.int32)
         same_policy_count = 0
 
-        # Main Training Loop (Episodes)
+        # Main training loop 
         for episode in trange(num_episodes, desc=f"Training on {grid_path.name}"):
             state = env.reset()
             terminated = False
             steps_in_episode = 0
             agent.episode_experience = []
 
-            # Generate One Episode
+            # Generate an episode of experience
             while not terminated and steps_in_episode < max_steps_per_episode:
                 # Agent takes an action based on the current state and policy
                 action = agent.take_action(state)
@@ -105,13 +122,13 @@ def main(grid_paths: list[Path], no_gui: bool, num_episodes: int, fps: int,
                 state = next_state
                 steps_in_episode += 1
 
-            # Episode Finished: Update Q-values
+            # Once the episode is finished update Q-values
             agent.update_q_from_episode()
 
-            # Decay Epsilon
+            # Update the exploration rate (epsilon)
             agent.update_epsilon()
 
-            # Early Stopping
+            # Check for the early stopping condition
             new_policy = agent.get_policy()
             if np.array_equal(new_policy, old_policy):
                 same_policy_count += 1
