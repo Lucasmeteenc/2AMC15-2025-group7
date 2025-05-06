@@ -27,6 +27,9 @@ class QLearningAgent(BaseAgent):
         self.epsilon = 1.0
 
         self.old_state = None
+        
+        # Early exit if td improvement is too little 
+        self.little_improvement_steps = 0
 
     def decay_learning_params(self, nEpisodes: int, episode: int):
         if episode > 0.3*nEpisodes:
@@ -50,6 +53,12 @@ class QLearningAgent(BaseAgent):
 
         # Q-learning update
         self.Q_table[self.old_state[0], self.old_state[1], action] = self.Q_table[self.old_state[0], self.old_state[1], action] + self.alpha * TD_error
+        
+        if abs(self.alpha * TD_error) < 1e-6:
+            self.little_improvement_steps += 1
+        else:
+            self.little_improvement_steps = 0
+            
 
 
     def take_action(self, state: tuple[int, int], evaluate: bool = False) -> int:

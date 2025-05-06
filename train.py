@@ -47,6 +47,9 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
          sigma: float, random_seed: int, nEpisodes: int = 10_000):
     """Main loop of the program."""
 
+    # Ealy exit criterion
+    EARLY_EXIT_AFTER_N_STEPS = 50
+
     for grid in grid_paths:
         
         # Set up the environment
@@ -75,6 +78,10 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                     break
 
                 agent.update(state, reward, info["actual_action"])
+                
+            if agent.little_improvement_steps > EARLY_EXIT_AFTER_N_STEPS:
+                print(f"Early exit after {episode} episodes.")
+                break
         print(f"{np.argmax(agent.Q_table, axis=2)=}")
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
