@@ -42,35 +42,6 @@ def parse_args():
     return p.parse_args()
 
 
-@staticmethod
-def _neutral_reward_function(grid, agent_pos) -> float:
-    """This is a very simple reward function.
-
-    Args:
-        grid: The grid the agent is moving on, in case that is needed by
-            the reward function.
-        agent_pos: The position the agent is moving to.
-
-    Returns:
-        A single floating point value representing the reward for a given
-        action.
-    """
-
-    match grid[agent_pos]:
-        case 0:  # Moved to an empty tile
-            reward = -1
-        case 1 | 2:  # Moved to a wall or obstacle
-            reward = -5
-            pass
-        case 3:  # Moved to a target tile
-            reward = 10
-            # "Illegal move"
-        case _:
-            raise ValueError(f"Grid cell should not have value: {grid[agent_pos]}.",
-                            f"at position {agent_pos}")
-    return reward
-
-
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
          sigma: float, random_seed: int):
     """Main loop of the program."""
@@ -78,28 +49,28 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
     for grid in grid_paths:
         
         # Set up the environment
-        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, reward_fn=_neutral_reward_function,
+        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps,
                           random_seed=random_seed)
         
         env.reset()
         # Initialize agent
         agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid)
         
-        # Always reset the environment to initial state
-        state = env.reset()
-        for _ in trange(iters):
+        delta = float('inf')
+        max_iterations = 1000  
+        
+        for iteration in trange(max_iterations):
+            # Run one sweep of value iteration
+            delta = agent.value_iteration()
             
-            # Agent takes an action based on the latest observation and info.
-            action = agent.take_action(state)
-
-            # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
-            
-            # If the final state is reached, stop.
-            if terminated:
+            # Check for convergence
+            if delta < agent.theta:
                 break
+                
+            # Safety check
+            if iteration >= max_iterations - 1:
+                print("Warning: Value Iteration did not converge within maximum iterations")
 
-            agent.update(state, reward, info["actual_action"])
 
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)

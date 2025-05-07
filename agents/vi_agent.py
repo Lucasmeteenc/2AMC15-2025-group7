@@ -80,13 +80,7 @@ class ViAgent(BaseAgent):
         return delta
     
     def update(self, state: tuple[int, int], reward: float, action):
-        """perform value iteration."""
-
-        # Nr of iterations based on grid_size
-        for _ in range((self.grid_size[0] + self.grid_size[1]) // 2):
-            delta = self.value_iteration()
-            if delta < self.theta:
-                break
+        pass
     
     def take_action(self, state: tuple[int, int]) -> int:
         """Choose the action that maximizes expected future reward."""
