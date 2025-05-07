@@ -20,7 +20,7 @@ class ViAgent(BaseAgent):
         self.actions = [0, 1, 2, 3]     # Possible actions (Down, Up, Left, Right)
         self.reward_fn = reward         # Reward function
         self.grid = grid                # Grid environment
-        self.theta = 0.01               # Convergence threshold
+        self.theta = 10**-6              # Convergence threshold
         self.sigma = sigma              # Stochasticity that agent takes random action
         
         # Initialize the value function
@@ -37,7 +37,7 @@ class ViAgent(BaseAgent):
     
     def value_iteration(self):
         """Perform one sweep of value iteration over the state space."""
-            
+        
         delta = 0
         
         # For each state
@@ -49,30 +49,34 @@ class ViAgent(BaseAgent):
                 # Store old value
                 old_v = self.V[i, j]
                 
-                # Find the maximum value among all actions
+                # Compute the value of each action
                 action_values = []
+                
                 for a in self.actions:
-                    next_state = tuple(np.add((i, j), action_to_direction(a)))
-                    reward = self.reward_fn(self.grid, next_state)
+                    # Initialize expected value for this action
+                    expected_value = 0
                     
-                    # Calculate the expected value
-                    expected_value = (1 - self.sigma) * (reward + self.gamma * self.V[next_state])
-
-                    # Calculate probability for each other action
-                    other_action_prob = self.sigma / (len(self.actions) - 1)
-
-
-                    for other_a in self.actions:
-                        if other_a == a:
-                            continue
-                        alt_state = tuple(np.add((i, j), action_to_direction(other_a)))
-                        alt_reward = self.reward_fn(self.grid, alt_state)
-                        expected_value += other_action_prob * (alt_reward + self.gamma * self.V[alt_state])
-                        
+                    # Consider all possible outcomes due to stochasticity
+                    # With probability (1-sigma), the chosen action is taken
+                    # With probability sigma, a random action is taken
+                    
+                    # For the intended action (probability 1-sigma)
+                    intended_next_state = tuple(np.add((i, j), action_to_direction(a)))
+                    intended_reward = self.reward_fn(self.grid, intended_next_state)
+                    expected_value += (1 - self.sigma) * (intended_reward + self.gamma * self.V[intended_next_state])
+                    
+                    # For random actions (probability sigma/(len(actions)) for each)
+                    other_action_prob = self.sigma / len(self.actions)
+                    
+                    for random_a in self.actions:
+                        random_next_state = tuple(np.add((i, j), action_to_direction(random_a)))
+                        random_reward = self.reward_fn(self.grid, random_next_state)
+                        expected_value += other_action_prob * (random_reward + self.gamma * self.V[random_next_state])
+                    
                     action_values.append(expected_value)
                 
-                # Update value with the max
-                self.V[i, j] = max(action_values) if action_values else old_v
+                # Update value with the max of all action values
+                self.V[i, j] = max(action_values)
                 
                 # Track the maximum change
                 delta = max(delta, abs(old_v - self.V[i, j]))
@@ -80,6 +84,7 @@ class ViAgent(BaseAgent):
         return delta
     
     def update(self, state: tuple[int, int], reward: float, action):
+        """Since we learn from the model and not from experiences of the environment"""
         pass
     
     def take_action(self, state: tuple[int, int]) -> int:
@@ -97,3 +102,11 @@ class ViAgent(BaseAgent):
                 best_action = a
         
         return best_action
+    
+    def get_policy(self):
+        """Extract the complete policy from the value function for all states."""
+        policy = np.zeros(self.grid_size, dtype=int)
+        for i in range(self.grid_size[0]):
+            for j in range(self.grid_size[1]):
+                policy[i, j] = self.take_action((i, j)) 
+        return policy

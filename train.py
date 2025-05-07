@@ -54,10 +54,10 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         
         env.reset()
         # Initialize agent
-        agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid)
+        agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
         
         delta = float('inf')
-        max_iterations = 1000  
+        max_iterations = 1000
         
         for iteration in trange(max_iterations):
             # Run one sweep of value iteration
