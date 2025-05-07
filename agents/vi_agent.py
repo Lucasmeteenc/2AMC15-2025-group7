@@ -23,15 +23,17 @@ class ViAgent(BaseAgent):
         self.theta = 10**-6              # Convergence threshold
         self.sigma = sigma              # Stochasticity that agent takes random action
         
-        # Initialize the value function
-        self.initialize_values()
+        # Initialize the value function see function description for why not used
+        # self.initialize_values()
     
     def initialize_values(self):
         """Initialize the value function based on grid information."""
+        """Using this gave a worse result than not using it mainly due to the -100 for the walls and the random moving into it
+         which is already penalized with the reward"""
         for i in range(self.grid_size[0]):
             for j in range(self.grid_size[1]):
                 if self.grid[i, j] in [1, 2]:  # Wall or obstacle
-                    self.V[i, j] = -100.0
+                    self.V[i, j] = -100
                 elif self.grid[i, j] == 3:     # Target
                     self.V[i, j] = 10.0
     
@@ -55,19 +57,22 @@ class ViAgent(BaseAgent):
                 for a in self.actions:
                     # Initialize expected value for this action
                     expected_value = 0
-                    
+
                     # Consider all possible outcomes due to stochasticity
                     # With probability (1-sigma), the chosen action is taken
                     # With probability sigma, a random action is taken
-                    
+
                     # For the intended action (probability 1-sigma)
-                    intended_next_state = tuple(np.add((i, j), action_to_direction(a)))
+                    if self.grid[i,j] == 3:
+                        intended_next_state = (i,j)
+                    else:
+                        intended_next_state = tuple(np.add((i, j), action_to_direction(a)))
                     intended_reward = self.reward_fn(self.grid, intended_next_state)
                     expected_value += (1 - self.sigma) * (intended_reward + self.gamma * self.V[intended_next_state])
-                    
+
                     # For random actions (probability sigma/(len(actions)) for each)
                     other_action_prob = self.sigma / len(self.actions)
-                    
+
                     for random_a in self.actions:
                         random_next_state = tuple(np.add((i, j), action_to_direction(random_a)))
                         random_reward = self.reward_fn(self.grid, random_next_state)
@@ -110,3 +115,64 @@ class ViAgent(BaseAgent):
             for j in range(self.grid_size[1]):
                 policy[i, j] = self.take_action((i, j)) 
         return policy
+
+
+    def print_policy(self, init_grid):
+        """
+        Print the policy in a human-readable format.
+
+        Args:
+            init_grid (np.ndarray): The grid environment.
+        """
+        print("\nPolicy (best action for each state):")
+        found_policy = self.V
+        H, W = found_policy.shape
+
+        # action_symbols = {
+        #     0: '↓',  # Down
+        #     1: '↑',  # Up
+        #     2: '←',  # Left
+        #     3: '→'  # Right
+        # }
+        wall_symbol = '#'
+
+        WALL_VALUE = 1
+        OBSTACLE_VALUE = 2
+        TARGET_VALUE = 3
+
+        print("-" * (H * 2 + 1))
+
+        # Print the transposed policy row by row
+        for r_vis in range(W):
+            row_str = "|"
+            for c_vis in range(H):
+                original_row = c_vis
+                original_col = r_vis
+
+                if init_grid[original_row, original_col] == WALL_VALUE or init_grid[
+                    original_row, original_col] == OBSTACLE_VALUE:
+                    row_str += wall_symbol + " "
+                elif init_grid[original_row, original_col] == TARGET_VALUE:
+                    row_str += "T" + " "
+                else:
+                    action = found_policy[original_row, original_col]
+                    highest_value = -100
+                    next_action = ''
+                    if found_policy[original_row, original_col+1] > highest_value and init_grid[original_row, original_col+1] != WALL_VALUE:
+                        highest_value = found_policy[original_row, original_col+1]
+                        next_action = '↓'
+                    if found_policy[original_row+1, original_col] > highest_value and init_grid[original_row+1, original_col] != WALL_VALUE:
+                        highest_value = found_policy[original_row+1, original_col]
+                        next_action = '→'
+                    if found_policy[original_row, original_col-1] > highest_value and init_grid[original_row, original_col-1] != WALL_VALUE:
+                        highest_value = found_policy[original_row, original_col-1]
+                        next_action = '↑'
+                    if found_policy[original_row-1, original_col] > highest_value and init_grid[original_row-1, original_col] != WALL_VALUE:
+                        highest_value = found_policy[original_row+1, original_col]
+                        next_action = '←'
+                    row_str += "{} ".format(next_action,1)
+            row_str += "|"
+            print(row_str)
+
+        # print(found_policy)
+        print("-" * (H * 2 + 1))

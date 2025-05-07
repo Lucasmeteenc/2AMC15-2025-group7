@@ -5,6 +5,7 @@ Train your RL Agent in this file.
 from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import trange
+import numpy as np
 
 from agents.vi_agent import ViAgent
 
@@ -74,7 +75,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
-
+        agent.print_policy(np.copy(env.grid))
 
 if __name__ == '__main__':
     args = parse_args()
