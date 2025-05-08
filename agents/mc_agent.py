@@ -1,6 +1,8 @@
 import numpy as np
 import random
 from agents import BaseAgent
+from world import Environment
+from tqdm import trange
 
 class MonteCarloAgent(BaseAgent):
     def __init__(self, grid_shape, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999):
@@ -21,6 +23,7 @@ class MonteCarloAgent(BaseAgent):
         self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
         self.epsilon_decay = epsilon_decay
+        self.initial_epsilon = initial_epsilon
 
         # Initialize Q-table and Visit Counts
         self.Q = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
@@ -145,3 +148,65 @@ class MonteCarloAgent(BaseAgent):
             print(row_str)
 
         print("-" * (H * 2 + 1))
+
+    def train(self, env: Environment, num_episodes: int, max_steps_per_episode: int,
+                    early_stopping_patience: int):
+        
+        print(f"\n--- Training Monte Carlo Agent on Grid: {env.grid_fp.name} ---")
+
+        # Reset variables as safety measure
+        self.Q.fill(0)
+        self.N_visits.fill(0)
+        self.epsilon = self.initial_epsilon
+
+        init_grid_for_policy_print = np.copy(env.grid)
+
+        # Initialize variables for early stopping
+        old_policy = np.zeros((self.grid_height, self.grid_width), dtype=np.int32)
+        same_policy_count = 0
+
+        converged = False
+
+        # Main training loop 
+        for episode in trange(num_episodes, desc=f"MC Training on {env.grid_fp.name}"):
+            state = env.reset()
+            terminated = False
+            steps_in_episode = 0
+            self.episode_experience = []
+
+            # Generate an episode of experience
+            while not terminated and steps_in_episode < max_steps_per_episode:
+                # Agent takes an action based on the current state and policy
+                action = self.take_action(state)
+
+                # The action is performed in the environment
+                next_state, reward, terminated, _ = env.step(action)
+
+                # Store the experience for this step
+                self.update(state, reward, action)
+
+                # Move to the next state
+                state = next_state
+                steps_in_episode += 1
+
+            # Once the episode is finished update Q-values
+            self.update_q_from_episode()
+
+            # Update the exploration rate (epsilon)
+            self.update_epsilon()
+
+            new_policy = self.get_policy()
+            if np.array_equal(new_policy, old_policy):
+                same_policy_count += 1
+                if same_policy_count >= early_stopping_patience:
+                    converged = True
+                    break
+            else:
+                same_policy_count = 0
+            old_policy = new_policy.copy()
+
+        if converged:
+            print(f"\nMC Policy converged after {episode + 1} episodes.")
+        
+        print("\n--- MC Training completed ---")
+        self.print_policy(init_grid_for_policy_print)
