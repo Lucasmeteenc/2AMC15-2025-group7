@@ -54,24 +54,11 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                           random_seed=random_seed)
         
         env.reset()
+        
         # Initialize agent
         agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
         
-        delta = float('inf')
-        max_iterations = 1000
-        
-        for iteration in trange(max_iterations):
-            # Run one sweep of value iteration
-            delta = agent.value_iteration()
-            
-            # Check for convergence
-            if delta < agent.theta:
-                break
-                
-            # Safety check
-            if iteration >= max_iterations - 1:
-                print("Warning: Value Iteration did not converge within maximum iterations")
-
+        agent.train()
 
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)

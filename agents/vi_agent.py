@@ -7,6 +7,7 @@ import numpy as np
 from world.grid import Grid
 from agents import BaseAgent
 from world.helpers import action_to_direction
+from tqdm import trange
 
 
 class ViAgent(BaseAgent):
@@ -176,3 +177,19 @@ class ViAgent(BaseAgent):
 
         # print(found_policy)
         print("-" * (H * 2 + 1))
+    
+    def train(self):
+        delta = float('inf')
+        max_iterations = 1000
+        
+        for iteration in trange(max_iterations):
+            # Run one sweep of value iteration
+            delta = self.value_iteration()
+            
+            # Check for convergence
+            if delta < self.theta:
+                break
+                
+            # Safety check
+            if iteration >= max_iterations - 1:
+                print("Warning: Value Iteration did not converge within maximum iterations")
