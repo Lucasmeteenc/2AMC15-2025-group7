@@ -9,6 +9,9 @@ from tqdm import trange
 try:
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.vi_agent import ViAgent
+    from agents.mc_agent import MonteCarloAgent
+    from agents.q_learning_agent import QLearningAgent
 except ModuleNotFoundError:
     from os import path
     from os import pardir
@@ -20,6 +23,9 @@ except ModuleNotFoundError:
         sys.path.extend(root_path)
     from world import Environment
     from agents.random_agent import RandomAgent
+    from agents.vi_agent import ViAgent
+    from agents.mc_agent import MonteCarloAgent
+    from agents.q_learning_agent import QLearningAgent
 
 def parse_args():
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
@@ -33,10 +39,33 @@ def parse_args():
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
                         "no_gui is not set.")
-    p.add_argument("--iter", type=int, default=1000,
+    p.add_argument("--iters", type=int, default=1000,
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
+    
+    p.add_argument("--agent", type=str, default="vi",
+                   help="Agent selection: vi (Value Iteration), mc (On Policy Monte Carlo), ql (Q-Learning).")
+    
+    # Monte Carlo specific parameters
+    p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
+                   help="Maximum steps allowed per episode.")
+    p.add_argument("--gamma", type=float, default=0.99, # Discount factor
+                   help="Discount factor gamma.")
+    p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
+                   help="Initial exploration rate epsilon.")
+    p.add_argument("--min_epsilon", type=float, default=0.05, # Minimum Epsilon
+                   help="Minimum exploration rate epsilon.")
+    p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
+                   help="Epsilon decay rate per episode.")
+    p.add_argument("--early_stopping_patience_mc", type=int, default=250,
+                   help="Amount of episodes with the same policy that triggers early stopping.")
+    
+    # Q-Learning specific parameters
+    p.add_argument("--num_episodes", type=int, default=10_000,
+                   help="Number of episodes to train for.")
+    p.add_argument("--early_stopping_patience_ql", type=int, default=50,
+                   help="Amount of episodes with the same policy that triggers early stopping.")
     return p.parse_args()
 
 
@@ -73,6 +102,76 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
 
 
-if __name__ == '__main__':
+def main_dispatcher():
     args = parse_args()
-    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed)
+
+    no_gui = args.no_gui
+    sigma = args.sigma
+    fps = args.fps
+    random_seed = args.random_seed
+    agent = args.agent
+    iters = args.iters
+
+    for grid in args.GRID:
+
+        # Set up the environment
+        env = Environment(grid, no_gui, sigma=sigma, target_fps=fps, 
+                          random_seed=random_seed)
+        
+        # Always reset the environment to initial state
+        _ = env.reset()
+
+        if agent == "vi":
+            print("Using Value Iteration agent")
+
+            agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
+
+            agent.train(env)
+
+        elif agent == "mc":
+            print("Using On Policy Monte Carlo agent")
+
+            gamma = args.gamma
+            epsilon = args.epsilon
+            min_epsilon = args.min_epsilon
+            epsilon_decay = args.epsilon_decay
+            max_steps_per_episode = args.max_steps_per_episode
+            early_stopping_patience = args.early_stopping_patience_mc
+
+            grid_shape = env.grid.shape
+
+            agent = MonteCarloAgent(grid_shape=grid_shape,
+                                    grid_name=grid,
+                                    gamma=gamma,
+                                    initial_epsilon=epsilon,
+                                    min_epsilon=min_epsilon,
+                                    epsilon_decay=epsilon_decay,
+                                    max_steps_per_episode=max_steps_per_episode)
+        
+            agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
+
+            # Set the exploration rate to 0 for evaluation
+            agent.epsilon = 0
+        
+        elif agent == "ql":
+            print("Using Q-Learning agent")
+
+            num_episodes = args.num_episodes
+            early_stopping_patience = args.early_stopping_patience_ql
+
+            agent = QLearningAgent(env.grid, gamma=0.9)
+
+            agent.train(env, num_episodes, iters, early_stopping_patience)
+
+            # Set the exploration rate to 0 for evaluation
+            agent.epsilon = 0
+        
+        else:
+            raise ValueError(f"Unknown agent type: {agent}")
+
+        # Evaluate the agent
+        Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
+
+
+if __name__ == '__main__':
+    main_dispatcher()
