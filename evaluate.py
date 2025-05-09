@@ -4,6 +4,7 @@ Train your RL Agent in this file.
 
 from argparse import ArgumentParser
 from pathlib import Path
+import random
 
 try:
     from world import Environment
@@ -38,7 +39,7 @@ def parse_args():
     # Monte Carlo specific parameters
     p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
                    help="Maximum steps allowed per episode.")
-    p.add_argument("--gamma", type=float, default=0.99, # Discount factor
+    p.add_argument("--gamma", type=float, default=0.9, # Discount factor
                    help="Discount factor gamma.")
     p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
                    help="Initial exploration rate epsilon.")
@@ -51,6 +52,40 @@ def parse_args():
     
     return p.parse_args()
 
+
+def run_train_loop(grid: str, no_gui: bool, iters: int, fps: int,
+         sigma: float, gamma: float, epsilon: float, min_epsilon: float,
+         epsilon_decay: float, max_steps_per_episode: int,
+         early_stopping_patience: int):
+    
+    random_seed = random.randint(0, 1000000000)
+    
+    # Set up the environment
+    env = Environment(grid, no_gui=no_gui, sigma=sigma, target_fps=fps,
+                    random_seed=random_seed)
+    
+    _ = env.reset() # Call reset once to load the grid
+    grid_shape = env.grid.shape
+
+    # Initialize agent
+    agent = MonteCarloAgent(grid_shape=grid_shape,
+                            grid_name=grid,
+                            gamma=gamma,
+                            initial_epsilon=epsilon,
+                            min_epsilon=min_epsilon,
+                            epsilon_decay=epsilon_decay,
+                            stochasticity=sigma,
+                            max_steps_per_episode=max_steps_per_episode,
+                            reward_function="Default")
+    
+    agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
+
+    # Evaluate agent with a greedy policy
+    # print(f"Evaluating agent on {grid.name}...")
+
+    # agent.epsilon = 0
+    # Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
+    # TODO add end performance as a metric iff interesting.
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
          sigma: float, gamma: float, epsilon: float, min_epsilon: float,
@@ -74,32 +109,20 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         early_stopping_patience (int): Amount of episodes with the same policy that triggers early stopping.
     """
 
-    for grid in grid_paths:
-        # Set up the environment
-        env = Environment(grid, no_gui=no_gui, sigma=sigma, target_fps=fps,
-                          random_seed=random_seed)
-        
-        _ = env.reset() # Call reset once to load the grid
-        grid_shape = env.grid.shape
+    sigmas = [0.0, 0.1, 0.3]
+    gammas = [0.4, 0.9]
 
-        # Initialize agent
-        agent = MonteCarloAgent(grid_shape=grid_shape,
-                                grid_name=grid,
-                                gamma=gamma,
-                                initial_epsilon=epsilon,
-                                min_epsilon=min_epsilon,
-                                epsilon_decay=epsilon_decay,
-                                stochasticity=sigma,
-                                max_steps_per_episode=max_steps_per_episode,
-                                reward_function="Default")
-        
-        agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
+    for run in range(20):
+        for grid in grid_paths:
+            for sigma in sigmas:
+                run_train_loop(grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience)
 
-        # Evaluate agent with a greedy policy
-        print(f"Evaluating agent on {grid.name}...")
+            sigma = 0.1
+            for gamma in gammas:
+                run_train_loop(grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience)
 
-        agent.epsilon = 0
-        Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
+            gamma = 0.9
+
 
 if __name__ == '__main__':
     args = parse_args()
