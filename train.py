@@ -30,7 +30,7 @@ def parse_args():
                    help="Sigma value for the stochasticity of the environment.")
     p.add_argument("--fps", type=int, default=300,
                    help="Frames per second (only if GUI enabled).")
-    p.add_argument("--iter", type=int, default=5000,
+    p.add_argument("--iters", type=int, default=5000,
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
@@ -84,6 +84,7 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
 
         # Initialize agent
         agent = MonteCarloAgent(grid_shape=grid_shape,
+                                grid_name=grid,
                                 gamma=gamma,
                                 initial_epsilon=epsilon,
                                 min_epsilon=min_epsilon,
