@@ -1,14 +1,11 @@
 """
 Train your RL Agent in this file. 
 """
-import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
-from tqdm import trange
 
 try:
     from world import Environment
-    from agents.random_agent import RandomAgent
     from agents.q_learning_agent import QLearningAgent
 
 except ModuleNotFoundError:
@@ -21,7 +18,6 @@ except ModuleNotFoundError:
     if root_path not in sys.path:
         sys.path.extend(root_path)
     from world import Environment
-    from agents.random_agent import RandomAgent
     from agents.q_learning_agent import QLearningAgent
 
 def parse_args():
@@ -40,15 +36,18 @@ def parse_args():
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
+    
+    # Q-Learning specific parameters
+    p.add_argument("--num_episodes", type=int, default=10_000,
+                   help="Number of episodes to train for.")
+    p.add_argument("--early_stopping_patience", type=int, default=50,
+                   help="Amount of episodes with the same policy that triggers early stopping.")
     return p.parse_args()
 
 
 def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int, nEpisodes: int = 10_000):
+         sigma: float, random_seed: int, num_episodes: int, early_stopping_patience: int):
     """Main loop of the program."""
-
-    # Ealy exit criterion
-    EARLY_EXIT_AFTER_N_STEPS = 50
 
     for grid in grid_paths:
         
@@ -57,36 +56,17 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                           random_seed=random_seed)
         
         # Always reset the environment to initial state
-        state = env.reset()
+        _ = env.reset()
 
         # Initialize agent
         agent = QLearningAgent(env.grid, gamma=0.9)
-        
-        for episode in range(nEpisodes):
-            state = env.reset()
-            agent.decay_learning_params(nEpisodes,episode)
-            for _ in trange(iters):
-                
-                # Agent takes an action based on the latest observation and info.
-                action = agent.take_action(state)
 
-                # The action is performed in the environment
-                state, reward, terminated, info = env.step(action)
-                
-                # If the final state is reached, stop.
-                if terminated:
-                    break
+        agent.train(env, num_episodes, iters, early_stopping_patience)
 
-                agent.update(state, reward, info["actual_action"])
-                
-            if agent.little_improvement_steps > EARLY_EXIT_AFTER_N_STEPS:
-                print(f"Early exit after {episode} episodes.")
-                break
-        print(f"{np.argmax(agent.Q_table, axis=2)=}")
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
 
 
 if __name__ == '__main__':
     args = parse_args()
-    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed)
+    main(args.GRID, args.no_gui, args.iter, args.fps, args.sigma, args.random_seed, args.num_episodes, args.early_stopping_patience)

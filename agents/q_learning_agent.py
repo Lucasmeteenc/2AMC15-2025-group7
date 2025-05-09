@@ -6,7 +6,8 @@ from random import randint
 import numpy as np
 
 from agents import BaseAgent
-from world.grid import Grid
+from world import Environment
+from tqdm import trange
 
 
 class QLearningAgent(BaseAgent):
@@ -74,3 +75,30 @@ class QLearningAgent(BaseAgent):
             return np.argmax(self.Q_table[state[0], state[1]])
         else:
             return np.random.randint(self.nr_actions)
+        
+    def train(self, env: Environment, num_episodes: int, iters: int, early_stopping_patience: int):
+        for episode in range(num_episodes):
+            
+            state = env.reset()
+            self.decay_learning_params(num_episodes,episode)
+
+            for _ in trange(iters):
+                
+                # Agent takes an action based on the latest observation and info.
+                action = self.take_action(state)
+
+                # The action is performed in the environment
+                state, reward, terminated, info = env.step(action)
+                
+                # If the final state is reached, stop.
+                if terminated:
+                    break
+
+                self.update(state, reward, info["actual_action"])
+                
+            if self.little_improvement_steps > early_stopping_patience:
+                print(f"Early exit after {episode} episodes.")
+                break
+    
+        print(f"{np.argmax(self.Q_table, axis=2)=}")
+    
