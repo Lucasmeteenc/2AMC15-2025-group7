@@ -5,7 +5,7 @@ from world import Environment
 from tqdm import trange
 
 class MonteCarloAgent(BaseAgent):
-    def __init__(self, grid_shape, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999):
+    def __init__(self, grid_shape, grid_name: str, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999, stochasticity=-1, max_steps_per_episode=-1, reward_function="Default"):
         """
         Initialize the Monte Carlo Agent.
 
@@ -17,6 +17,8 @@ class MonteCarloAgent(BaseAgent):
             min_epsilon (float): Minimum value for epsilon.
             epsilon_decay (float): Factor to decay epsilon by each episode.
         """
+        super().__init__()
+        
         self.grid_height, self.grid_width = grid_shape
         self.num_actions = num_actions
         self.gamma = gamma
@@ -28,8 +30,11 @@ class MonteCarloAgent(BaseAgent):
         # Initialize Q-table and Visit Counts
         self.Q = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
         self.N_visits = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.uint32)
+        self.last_used_alpha = -1
 
         self.episode_experience = [] 
+        
+        self._set_parameters("Monte Carlo", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
 
     def take_action(self, state: tuple[int, int]) -> int:
         """
@@ -67,6 +72,8 @@ class MonteCarloAgent(BaseAgent):
         """
 
         self.episode_experience.append((state, reward, action))
+        
+        self.step += 1
 
     def update_q_from_episode(self):
         """
@@ -91,6 +98,7 @@ class MonteCarloAgent(BaseAgent):
             self.N_visits[row, col, action] += 1
             
             alpha = 1.0 / (self.N_visits[row, col, action]**0.5)
+            self.last_used_alpha = alpha
             
             # Update Q-value
             current_q = self.Q[row, col, action]
@@ -166,6 +174,7 @@ class MonteCarloAgent(BaseAgent):
         same_policy_count = 0
 
         converged = False
+        
 
         # Main training loop 
         for episode in trange(num_episodes, desc=f"MC Training on {env.grid_fp.name}"):
@@ -204,6 +213,10 @@ class MonteCarloAgent(BaseAgent):
             else:
                 same_policy_count = 0
             old_policy = new_policy.copy()
+            
+            if self.episode % 100 == 0:
+                self.log_metrics(env.world_stats["cumulative_reward"], self.last_used_alpha, self.epsilon)
+            self.episode += 1
 
         if converged:
             print(f"\nMC Policy converged after {episode + 1} episodes.")
