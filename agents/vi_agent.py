@@ -103,6 +103,11 @@ class ViAgent(BaseAgent):
         
         for a in self.actions:
             next_state = tuple(np.add(state, action_to_direction(a)))
+
+            # Out of bounds check
+            if 0 > next_state[0] or next_state[0] >= self.grid_size[0] or 0 > next_state[1] or next_state[1] >= self.grid_size[1]:
+                continue
+
             r = self.reward_fn(self.grid, next_state)
             value = r + self.gamma * self.V[next_state]
             if value > best_value:
@@ -179,7 +184,23 @@ class ViAgent(BaseAgent):
 
         # print(found_policy)
         print("-" * (H * 2 + 1))
-    
+
+    # Evaluate the current policy.
+    def evaluate_current_policy(self, env: Environment):
+        policy = self.get_policy()
+
+        terminated = False
+        i = 0
+        while not terminated and i < 1000:  # i serves as failsafe if policy has infinite loop
+            action = policy[env.agent_pos]
+            state, reward, terminated, info = env.step(action)
+            i+=1
+        
+        reward = env.world_stats["cumulative_reward"]
+
+        env.reset()
+        return reward
+
     def train(self, env: Environment):
         delta = float('inf')
         max_iterations = 1000
@@ -196,12 +217,11 @@ class ViAgent(BaseAgent):
             if iteration >= max_iterations - 1:
                 print("Warning: Value Iteration did not converge within maximum iterations")
 
-            if self.step % 10 == 0:
-                # TODO cumulative reward is still 0 because we don't evaluate on world.
-                self.log_metrics(env.world_stats["cumulative_reward"])
+            if self.step % 20 == 0:
+                self.log_metrics(self.evaluate_current_policy(env))
             self.step += 1
             self.episode += 1
 
-        self.log_metrics(env.world_stats["cumulative_reward"])
+        self.log_metrics(self.evaluate_current_policy(env))
         
         self.print_policy(np.copy(env.grid))
