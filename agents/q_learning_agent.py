@@ -11,12 +11,14 @@ from tqdm import trange
 
 
 class QLearningAgent(BaseAgent):
-    def __init__(self, grid: np.ndarray, gamma: float, nr_actions: int = 4):
+    def __init__(self, grid: np.ndarray, grid_name: str, gamma: float, nr_actions: int = 4, stochasticity=-1, initial_epsilon = 1.0, max_steps_per_episode=-1, reward_function="Default"):
         """Base agent. All other agents should build on this class.
 
         As a reminder, you are free to add more methods/functions to this class
         if your agent requires it.
         """
+        super().__init__()
+
         self.nr_actions = nr_actions
 
         self.n_cols, self.n_rows= grid.shape
@@ -25,12 +27,14 @@ class QLearningAgent(BaseAgent):
         self.gamma = gamma
 
         self.alpha = 0.1
-        self.epsilon = 1.0
+        self.epsilon = initial_epsilon
 
         self.old_state = None
         
         # Early exit if td improvement is too little 
         self.little_improvement_steps = 0
+
+        self._set_parameters("Q learning", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
 
     def decay_learning_params(self, nEpisodes: int, episode: int):
         if episode > 0.3*nEpisodes:
@@ -95,10 +99,19 @@ class QLearningAgent(BaseAgent):
                     break
 
                 self.update(state, reward, info["actual_action"])
+
+                # Every 1000 steps write an iter log
+                if self.step % 1000 == 0:
+                    self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon)
+                self.step += 1
                 
             if self.little_improvement_steps > early_stopping_patience:
                 print(f"Early exit after {episode} episodes.")
                 break
+
+            if self.episode % 100 == 0:
+                self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon)
+            self.episode += 1
     
         print(f"{np.argmax(self.Q_table, axis=2)=}")
     

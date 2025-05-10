@@ -12,7 +12,7 @@ from world.environment import Environment
 
 class ViAgent(BaseAgent):
     """Agent that performs Value Iteration to find optimal policy."""
-    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, gamma: float = 0.9, sigma: float = 0.1):
+    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, grid_name="grid_configs/A1_grid.npy", gamma: float = 0.9, sigma: float = 0.1, reward_function="Default"):
         super().__init__()
         
         self.grid_size = grid_size
@@ -26,6 +26,8 @@ class ViAgent(BaseAgent):
         
         # Initialize the value function see function description for why not used
         # self.initialize_values()
+        self._set_parameters("Value Iteration", stochasticity=sigma, discount_factor=gamma, grid_name=grid_name, reward_function=reward_function)
+
     
     def initialize_values(self):
         """Initialize the value function based on grid information."""
@@ -193,5 +195,13 @@ class ViAgent(BaseAgent):
             # Safety check
             if iteration >= max_iterations - 1:
                 print("Warning: Value Iteration did not converge within maximum iterations")
+
+            if self.step % 10 == 0:
+                # TODO cumulative reward is still 0 because we don't evaluate on world.
+                self.log_metrics(env.world_stats["cumulative_reward"])
+            self.step += 1
+            self.episode += 1
+
+        self.log_metrics(env.world_stats["cumulative_reward"])
         
         self.print_policy(np.copy(env.grid))

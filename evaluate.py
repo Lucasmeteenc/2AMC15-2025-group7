@@ -113,7 +113,7 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
     if agent == "vi":
         print("Using Value Iteration agent")
 
-        agent = ViAgent(gamma=gamma, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
+        agent = ViAgent(grid_name=grid, gamma=gamma, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
 
         agent.train(env)
 
@@ -145,7 +145,12 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
     elif agent == "ql":
         print("Using Q-Learning agent")
 
-        agent = QLearningAgent(env.grid, gamma=gamma)
+        agent = QLearningAgent(env.grid, 
+                                gamma=gamma, 
+                                grid_name=grid,
+                                stochasticity=sigma,
+                                initial_epsilon=epsilon,
+                                max_steps_per_episode=max_steps_per_episode)
 
         agent.train(env, iters, max_steps_per_episode, early_stopping_patience_q)
 
