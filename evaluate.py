@@ -67,39 +67,6 @@ def parse_args():
     return p.parse_args()
 
 
-def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int):
-    """Main loop of the program."""
-
-    for grid in grid_paths:
-        
-        # Set up the environment
-        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, 
-                          random_seed=random_seed)
-        
-        # Initialize agent
-        agent = RandomAgent()
-        
-        # Always reset the environment to initial state
-        state = env.reset()
-        for _ in trange(iters):
-            
-            # Agent takes an action based on the latest observation and info.
-            action = agent.take_action(state)
-
-            # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
-            
-            # If the final state is reached, stop.
-            if terminated:
-                break
-
-            agent.update(state, reward, info["actual_action"])
-
-        # Evaluate the agent
-        Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
-
-
 def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_q):
     # Define random seed such that each loop is different.
     random_seed = random.randint(-1000000000, 1000000000)
@@ -135,6 +102,7 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
                                 initial_epsilon=epsilon,
                                 min_epsilon=min_epsilon,
                                 epsilon_decay=epsilon_decay,
+                                stochasticity=sigma,
                                 max_steps_per_episode=max_steps_per_episode)
     
         agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
@@ -164,9 +132,6 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
     # Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
 
 
-
-
-
 def main_dispatcher():
     args = parse_args()
 
@@ -189,9 +154,12 @@ def main_dispatcher():
 
     agents = ["vi", "ql", "mc"]
     sigmas = [0.0, 0.1, 0.3]
-    gammas = [0.4, 0.9]
-    start_epsilons = [1.0, 0.7, 0.3, 0.1]
-    episode_lengths = [100, 250, 500, 1000]
+    # gammas = [0.4, 0.9]
+    gammas = []
+    # start_epsilons = [1.0, 0.7, 0.3, 0.1]
+    start_epsilons = []
+    # episode_lengths = [100, 250, 500, 1000]
+    episode_lengths = []
 
     for agent in agents:
         for grid in args.GRID:
