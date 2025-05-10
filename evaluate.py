@@ -190,7 +190,8 @@ def main_dispatcher():
     agents = ["vi", "ql", "mc"]
     sigmas = [0.0, 0.1, 0.3]
     gammas = [0.4, 0.9]
-
+    start_epsilons = [1.0, 0.7, 0.3, 0.1]
+    episode_lengths = [100, 250, 500, 1000]
 
     for agent in agents:
         for grid in args.GRID:
@@ -201,6 +202,17 @@ def main_dispatcher():
             # Dicounted reward
             for mod_gamma in gammas:
                 run_train_loop(agent, grid, no_gui, iters, fps, sigma, mod_gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
+
+            if agent != "vi":
+                # Starting epsilon. Is still decayed using the same epsilon_decay 
+                for mod_epsilon in start_epsilons:
+                    run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, mod_epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
+
+                # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
+                for mod_episode_length in episode_lengths:
+                    run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, mod_episode_length, early_stopping_patience_mc, early_stopping_patience_ql)
+
+                # TODO learning rate.
 
 
 if __name__ == '__main__':
