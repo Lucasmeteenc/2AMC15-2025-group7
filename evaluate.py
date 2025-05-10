@@ -161,26 +161,27 @@ def main_dispatcher():
     # episode_lengths = [100, 250, 500, 1000]
     episode_lengths = []
 
-    for agent in agents:
-        for grid in args.GRID:
-            # Stochasity
-            for mod_sigma in sigmas:
-                run_train_loop(agent, grid, no_gui, iters, fps, mod_sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
-            
-            # Dicounted reward
-            for mod_gamma in gammas:
-                run_train_loop(agent, grid, no_gui, iters, fps, sigma, mod_gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
+    for run in range(3):
+        for agent in agents:
+            for grid in args.GRID:
+                # Stochasity
+                for mod_sigma in sigmas:
+                    run_train_loop(agent, grid, no_gui, iters, fps, mod_sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
+                
+                # Dicounted reward
+                for mod_gamma in gammas:
+                    run_train_loop(agent, grid, no_gui, iters, fps, sigma, mod_gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
 
-            if agent != "vi":
-                # Starting epsilon. Is still decayed using the same epsilon_decay 
-                for mod_epsilon in start_epsilons:
-                    run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, mod_epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
+                if agent != "vi":
+                    # Starting epsilon. Is still decayed using the same epsilon_decay 
+                    for mod_epsilon in start_epsilons:
+                        run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, mod_epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql)
 
-                # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
-                for mod_episode_length in episode_lengths:
-                    run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, mod_episode_length, early_stopping_patience_mc, early_stopping_patience_ql)
+                    # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
+                    for mod_episode_length in episode_lengths:
+                        run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, mod_episode_length, early_stopping_patience_mc, early_stopping_patience_ql)
 
-                # TODO learning rate.
+                    # TODO learning rate.
 
 
 if __name__ == '__main__':
