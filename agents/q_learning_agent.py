@@ -41,7 +41,6 @@ class QLearningAgent(BaseAgent):
             self.alpha = self.alpha * 0.9995      #initial_alpha / (1 + i / 1000)
             self.epsilon = self.epsilon * 0.999  #max(min_epsilon, initial_epsilon * np.exp(-i / decay_rate))
 
-    """Agent that performs a random action every time. """
     def update(self, state: tuple[int, int], reward: float, action):
         """Any code that processes a reward given the state and updates the agent.
 
@@ -63,8 +62,6 @@ class QLearningAgent(BaseAgent):
             self.little_improvement_steps += 1
         else:
             self.little_improvement_steps = 0
-            
-
 
     def take_action(self, state: tuple[int, int], evaluate: bool = False) -> int:
         """Any code that does the action should be included here.

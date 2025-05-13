@@ -80,23 +80,19 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
     if agent == "vi":
         print("Using Value Iteration agent")
 
-        agent = ViAgent(grid_name=grid, gamma=gamma, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
+        agent = ViAgent(grid_name=grid, 
+                        grid_size=env.grid.shape, 
+                        grid=env.grid, 
+                        gamma=gamma, 
+                        reward=env.reward_fn, 
+                        sigma=sigma)
 
         agent.train(env)
 
     elif agent == "mc":
         print("Using On Policy Monte Carlo agent")
 
-        gamma = gamma
-        epsilon = epsilon
-        min_epsilon = min_epsilon
-        epsilon_decay = epsilon_decay
-        max_steps_per_episode = max_steps_per_episode
-        early_stopping_patience = early_stopping_patience_mc
-
-        grid_shape = env.grid.shape
-
-        agent = MonteCarloAgent(grid_shape=grid_shape,
+        agent = MonteCarloAgent(grid_shape=env.grid.shape,
                                 grid_name=grid,
                                 gamma=gamma,
                                 initial_epsilon=epsilon,
@@ -105,7 +101,7 @@ def run_train_loop(agent, grid, no_gui, iters, fps, sigma, gamma, epsilon, min_e
                                 stochasticity=sigma,
                                 max_steps_per_episode=max_steps_per_episode)
     
-        agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
+        agent.train(env, iters, max_steps_per_episode, early_stopping_patience_mc)
 
         # Set the exploration rate to 0 for evaluation
         agent.epsilon = 0
@@ -154,14 +150,11 @@ def main_dispatcher():
 
     agents = ["vi", "ql", "mc"]
     sigmas = [0.0, 0.1, 0.3]
-    # gammas = [0.4, 0.9]
-    gammas = []
-    # start_epsilons = [1.0, 0.7, 0.3, 0.1]
-    start_epsilons = []
-    # episode_lengths = [100, 250, 500, 1000]
-    episode_lengths = []
+    gammas = [0.4, 0.9]
+    start_epsilons = [1.0, 0.7, 0.3, 0.1]
+    episode_lengths = [100, 250, 500, 1000]
 
-    for run in range(3):
+    for run in range(1):
         for agent in agents:
             for grid in args.GRID:
                 # Stochasity
