@@ -28,7 +28,7 @@ class BaseAgent():
         self.episode = 0
         self.logging_file_path = "evaluate/results.csv"
 
-    def log_metrics(self, cumulative_reward,alpha=-1.0, epsilon=-1.0, performance_metric=-1):
+    def log_metrics(self, cumulative_reward,alpha=-1.0, epsilon=-1.0, conv_metricV=-1.0,conv_metricQ=-1.0):
         if not hasattr(self, 'run_id'):
             raise ValueError("BaseAgent has not been initialized. Ensure, you run 'super().__init__()'")
 
@@ -57,7 +57,8 @@ class BaseAgent():
             cumulative_reward,
             self.step,
             self.episode,
-            performance_metric
+            conv_metricV,
+            conv_metricQ
         ]
 
         # Check if the file exists
@@ -71,7 +72,7 @@ class BaseAgent():
                 header = [
                     'run_id', 'algorithm', 'stochasticity', 'discount_factor', 'learning_rate',
                     'epsilon', 'episode_length_mc', 'grid_name', 'reward_function', 
-                    'cumulative_reward', 'step', 'episode', 'performance_metric'
+                    'cumulative_reward', 'step', 'episode', 'conv_metricV','conv_metricQ'
                 ]
                 writer.writerow(header)
 

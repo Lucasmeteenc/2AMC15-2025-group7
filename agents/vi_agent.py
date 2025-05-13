@@ -1,6 +1,6 @@
 """vi Agent.
 
-This is an agent that takes the action wich maximizes the value of the value function.
+This is an agent that takes the action which maximizes the value of the value function.
 """
 import numpy as np
 
