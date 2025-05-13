@@ -26,7 +26,7 @@ class QLearningAgent(BaseAgent):
         self.Q_table = np.zeros((self.n_rows, self.n_cols, self.nr_actions))
         self.gamma = gamma
 
-        self.alpha = 0.1
+        self.alpha = 0.5
         self.epsilon = initial_epsilon
 
         self.old_state = None

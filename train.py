@@ -159,7 +159,12 @@ def main_dispatcher():
             num_episodes = args.num_episodes
             early_stopping_patience = args.early_stopping_patience_ql
 
-            agent = QLearningAgent(env.grid, gamma=0.9)
+            # agent = QLearningAgent(env.grid, gamma=0.9)
+
+            agent = QLearningAgent(env.grid, gamma=0.9, grid_name=grid, stochasticity=sigma, 
+                            initial_epsilon=1.0,
+                            max_steps_per_episode=1000)
+
 
             agent.train(env, num_episodes, iters, early_stopping_patience)
 
