@@ -9,7 +9,7 @@ import uuid
 import numpy as np
 import os
 import csv
-
+import filelock
 class BaseAgent():
     def __init__(self):
         """Base agent. All other agents should build on this class.
@@ -38,6 +38,7 @@ class BaseAgent():
             )
         
         file_path = self.logging_file_path
+        lock_path = f"{file_path}.lock"
         
         # Header formatting generated using ChatGPT:
         # https://chatgpt.com/share/681dc499-9e24-8001-93b2-1d11e7a01f58
@@ -61,23 +62,25 @@ class BaseAgent():
             conv_metricQ
         ]
 
-        # Check if the file exists
-        file_exists = os.path.exists(file_path)
+        # Use file lock to prevent concurrent writes
+        with filelock.FileLock(lock_path):
+            # Check if the file exists
+            file_exists = os.path.exists(file_path)
 
-        # Open file in append mode and write log data
-        with open(file_path, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            # If the file doesn't exist, write the header first
-            if not file_exists:
-                header = [
-                    'run_id', 'algorithm', 'stochasticity', 'discount_factor', 'learning_rate',
-                    'epsilon', 'episode_length_mc', 'grid_name', 'reward_function', 
-                    'cumulative_reward', 'step', 'episode', 'conv_metricV','conv_metricQ'
-                ]
-                writer.writerow(header)
+            # Open file in append mode and write log data
+            with open(file_path, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                # If the file doesn't exist, write the header first
+                if not file_exists:
+                    header = [
+                        'run_id', 'algorithm', 'stochasticity', 'discount_factor', 'learning_rate',
+                        'epsilon', 'episode_length_mc', 'grid_name', 'reward_function', 
+                        'cumulative_reward', 'step', 'episode', 'conv_metricV', 'conv_metricQ'
+                    ]
+                    writer.writerow(header)
 
-            # Append the current log data
-            writer.writerow(log_data)
+                # Append the current log data
+                writer.writerow(log_data)
             
 
     def _set_parameters(

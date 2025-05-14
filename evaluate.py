@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import trange
 import random
+import multiprocessing as mp
 
 try:
     from world import Environment
@@ -187,63 +188,87 @@ def main_dispatcher():
 
     # Define values to test for different parameters
     values_to_test = {
-        'sigma': [0.0, 0.1, 0.3],
-        'gamma': [0.4, 0.9, 0.99],
+        'sigma': [0.0, 0.1, 0.3, 0.5],
+        'gamma': [0.4, 0.8, 0.9, 0.95, 0.99],
         'epsilon': [1.0, 0.7, 0.3, 0.1],
         'num_episodes': [500, 1000, 5000, 10000],
         'max_steps_per_episode': [100, 250, 500, 1000],
         'early_stopping_patience': [50, 100, 250, 500, 1000]
     }
 
-    for run in range(10):
+    # Number of runs
+    num_runs = 10
+    
+    # Create task list for parallel execution
+    all_tasks = []
+    
+    for _ in range(num_runs):
         for agent in agents:
             for grid in args.GRID:
-                # Stochasity
+                # Stochasticity
                 for mod_sigma in values_to_test['sigma']:
-                    run_train_loop(agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                                   fps, mod_sigma, default_values[agent]['gamma'], default_values[agent]['epsilon'], 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience'])
+                    all_tasks.append((
+                        agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                        fps, mod_sigma, default_values[agent]['gamma'], default_values[agent]['epsilon'], 
+                        default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                        default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience']
+                    ))
                 
-                # Dicounted reward
+                # Discounted reward
                 for mod_gamma in values_to_test['gamma']:
-                    run_train_loop(agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                                   fps, default_values[agent]['sigma'], mod_gamma, default_values[agent]['epsilon'], 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience'])
+                    all_tasks.append((
+                        agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                        fps, default_values[agent]['sigma'], mod_gamma, default_values[agent]['epsilon'], 
+                        default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                        default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience']
+                    ))
 
                 if agent != "vi":
                     # Starting epsilon. Is still decayed using the same epsilon_decay 
                     for mod_epsilon in values_to_test['epsilon']:
-                        run_train_loop(agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                                   fps, default_values[agent]['sigma'], default_values[agent]['gamma'], mod_epsilon, 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience'])
+                        all_tasks.append((
+                            agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], mod_epsilon, 
+                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                            default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience']
+                        ))
                         
                     # Number of episodes
                     for mod_num_episodes in values_to_test['num_episodes']:
-                        run_train_loop(agent, grid, no_gui, mod_num_episodes, 
-                                   fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience'])
+                        all_tasks.append((
+                            agent, grid, no_gui, mod_num_episodes, 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
+                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                            default_values[agent]['max_steps_per_episode'], default_values[agent]['early_stopping_patience']
+                        ))
 
                     # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
                     for mod_max_steps_per_episode in values_to_test['max_steps_per_episode']:
-                        run_train_loop(agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                                   fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   mod_max_steps_per_episode, default_values[agent]['early_stopping_patience'])
+                        all_tasks.append((
+                            agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
+                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                            mod_max_steps_per_episode, default_values[agent]['early_stopping_patience']
+                        ))
+
                         
                     # Early stopping patience
                     for mod_early_stopping_patience in values_to_test['early_stopping_patience']:
-                        run_train_loop(agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                                   fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
-                                   default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                                   default_values[agent]['max_steps_per_episode'], mod_early_stopping_patience)
-
-
+                        all_tasks.append((
+                            agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
+                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
+                            default_values[agent]['max_steps_per_episode'], mod_early_stopping_patience
+                        ))
                     # TODO learning rate.
 
+    # Use CPU count - 1 to avoid overwhelming the system
+    num_processes = max(1, mp.cpu_count() - 1)
+    print(f"Running {len(all_tasks)} experiments using {num_processes} parallel processes")
+    
+    with mp.Pool(processes=num_processes) as pool:
+        pool.starmap(run_train_loop, all_tasks)
 
 if __name__ == '__main__':
+    mp.freeze_support()
     main_dispatcher()
