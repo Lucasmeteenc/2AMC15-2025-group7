@@ -107,7 +107,6 @@ class QLearningAgent(BaseAgent):
                 self.step += 1
                 
             
-
             # if self.episode % 100 == 0:
             conv_metricV,conv_metricQ = self.get_convergence_metric()
             self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon,conv_metricV,conv_metricQ)
@@ -130,7 +129,7 @@ class QLearningAgent(BaseAgent):
         max_diff_V = np.max(np.abs(V - self.V_old)) #compute max difference between value functions
         self.V_old = V #update old value function for next iteration
 
-        abs_diff = np.abs(self.Q_table - self.Q_table_old)
-        max_diff_Q = np.max(abs_diff)
+        abs_diff = np.abs(self.Q_table - self.Q_table_old) # compute abs difference between Q-tables
+        max_diff_Q = np.max(abs_diff) # compute max difference between Q-tables
 
         return max_diff_V, max_diff_Q

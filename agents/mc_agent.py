@@ -32,6 +32,10 @@ class MonteCarloAgent(BaseAgent):
         self.N_visits = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.uint32)
         self.last_used_alpha = -1
 
+        # Initialize old Q-Table and old V to compute convergence speed later
+        self.Q_old = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
+        self.V_old = np.max(self.Q, axis=2)
+
         self.episode_experience = [] 
         
         self._set_parameters("Monte Carlo", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
@@ -183,6 +187,9 @@ class MonteCarloAgent(BaseAgent):
             steps_in_episode = 0
             self.episode_experience = []
 
+            # store current Q-table for convergence metric
+            self.Q_old = np.copy(self.Q)
+
             # Generate an episode of experience
             while not terminated and steps_in_episode < max_steps_per_episode:
                 # Agent takes an action based on the current state and policy
@@ -214,8 +221,9 @@ class MonteCarloAgent(BaseAgent):
                 same_policy_count = 0
             old_policy = new_policy.copy()
             
-            if self.episode % 100 == 0:
-                self.log_metrics(env.world_stats["cumulative_reward"], self.last_used_alpha, self.epsilon)
+            # if self.episode % 100 == 0:
+            conv_metricV,conv_metricQ = self.get_convergence_metric()
+            self.log_metrics(env.world_stats["cumulative_reward"], self.last_used_alpha, self.epsilon,conv_metricV,conv_metricQ)
             self.episode += 1
 
         if converged:
@@ -223,3 +231,18 @@ class MonteCarloAgent(BaseAgent):
         
         print("\n--- MC Training completed ---")
         self.print_policy(init_grid_for_policy_print)
+
+    def get_convergence_metric(self):
+        """
+        Computes value functions for current and previous Q-tables and returns absolute
+        difference between current and previous value function.
+        """
+        
+        V = np.max(self.Q, axis=2) #compute current value function
+        max_diff_V = np.max(np.abs(V - self.V_old)) #compute max difference between value functions
+        self.V_old = V #update old value function for next iteration
+
+        abs_diff = np.abs(self.Q - self.Q_old) # compute abs difference between Q-tables
+        max_diff_Q = np.max(abs_diff) # compute max difference between Q-tables
+
+        return max_diff_V, max_diff_Q 

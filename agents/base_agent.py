@@ -122,7 +122,7 @@ class BaseAgent():
         
         if logging_file_path:
             self.logging_file_path = logging_file_path
-        
+
     @abstractmethod
     def take_action(self, state: tuple[int, int]) -> int:
         """Any code that does the action should be included here.
@@ -143,3 +143,4 @@ class BaseAgent():
             action: The action which was taken by the agent.
         """
         raise NotImplementedError
+    
