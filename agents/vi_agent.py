@@ -217,11 +217,11 @@ class ViAgent(BaseAgent):
             if iteration >= max_iterations - 1:
                 print("Warning: Value Iteration did not converge within maximum iterations")
 
-            if self.step % 20 == 0:
-                self.log_metrics(self.evaluate_current_policy(env))
+            # if self.step % 20 == 0:
+            self.log_metrics(self.evaluate_current_policy(env),conv_metricV=delta)
             self.step += 1
             self.episode += 1
 
-        self.log_metrics(self.evaluate_current_policy(env))
+        # self.log_metrics(self.evaluate_current_policy(env))
         
         self.print_policy(np.copy(env.grid))
