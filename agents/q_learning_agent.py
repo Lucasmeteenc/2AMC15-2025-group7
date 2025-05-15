@@ -11,37 +11,58 @@ from tqdm import trange
 
 
 class QLearningAgent(BaseAgent):
-    def __init__(self, grid: np.ndarray, grid_name: str, gamma: float, nr_actions: int = 4, stochasticity=-1, initial_epsilon = 1.0, max_steps_per_episode=-1, reward_function="Default"):
+    def __init__(self, grid_shape, grid_name: str, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999, 
+                 initial_alpha=1.0, min_alpha=0.01, alpha_decay=0.999, stochasticity=-1, max_steps_per_episode=-1, reward_function="Default"):
         """...
 
         ...
         """
         super().__init__()
 
-        self.nr_actions = nr_actions
+        self.num_actions = num_actions
 
-        self.n_cols,self.n_rows = grid.shape
+        self.grid_height, self.grid_width = grid_shape
 
-        self.Q_table = np.zeros((self.n_rows, self.n_cols, self.nr_actions))
-        self.Q_table_old = np.zeros((self.n_rows, self.n_cols, self.nr_actions))
+        self.Q_table = np.zeros((self.grid_width, self.grid_height, self.num_actions))
+        self.Q_table_old = np.zeros((self.grid_width, self.grid_height, self.num_actions))
         self.V_old = np.max(self.Q_table,axis=2)
 
         self.gamma = gamma
 
-        self.alpha = 0.5
+        # Epsilon parameters
         self.epsilon = initial_epsilon
+        self.min_epsilon = min_epsilon
+        self.epsilon_decay = epsilon_decay
+        self.initial_epsilon = initial_epsilon
+
+        # Alpha parameters
+        self.alpha = initial_alpha
+        self.min_alpha = min_alpha
+        self.alpha_decay = alpha_decay
+        self.initial_alpha = initial_alpha
 
         self.old_state = None
         
         # Early exit if td improvement is too little
         self.little_improvement_steps = 0
 
+        self.max_steps_per_episode = max_steps_per_episode
+
         self._set_parameters("Q learning", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
 
-    def decay_learning_params(self, nEpisodes: int, episode: int):
-        if episode > 0.3*nEpisodes:
-            self.alpha = self.alpha * 0.9995      #initial_alpha / (1 + i / 1000)
-            self.epsilon = self.epsilon * 0.999  #max(min_epsilon, initial_epsilon * np.exp(-i / decay_rate))
+    def update_epsilon(self):
+        """
+        Update the exploration rate (epsilon) after each episode.
+        """
+        if self.epsilon > self.min_epsilon:
+            self.epsilon *= self.epsilon_decay
+
+    def update_alpha(self):
+        """
+        Update the learning rate (alpha) after each episode.
+        """
+        if self.alpha > self.min_alpha:
+            self.alpha *= self.alpha_decay
 
     def update(self, state: tuple[int, int], reward: float, action):
         """Any code that processes a reward given the state and updates the agent.
@@ -75,20 +96,21 @@ class QLearningAgent(BaseAgent):
         if evaluate or np.random.random() > self.epsilon:
             return np.argmax(self.Q_table[state[0], state[1]])
         else:
-            return np.random.randint(self.nr_actions)
+            return np.random.randint(self.num_actions)
         
-    def train(self, env: Environment, num_episodes: int, iters: int, early_stopping_patience: int):
+    def train(self, env: Environment, num_episodes: int, early_stopping_patience: int):
         
         for episode in trange(num_episodes):
             
             state = env.reset()
-            self.decay_learning_params(num_episodes,episode)
+            self.update_epsilon()
+            self.update_alpha()
 
             self.Q_table_old = np.copy(self.Q_table)
 
             init_grid_for_policy_print = np.copy(env.grid)
 
-            for _ in range(iters):
+            for _ in range(self.max_steps_per_episode):
                 
                 # Agent takes an action based on the latest observation and info.
                 action = self.take_action(state)

@@ -28,6 +28,7 @@ except ModuleNotFoundError:
     from agents.q_learning_agent import QLearningAgent
 
 def parse_args():
+    # Default parameters
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
     p.add_argument("GRID", type=Path, nargs="+",
                    help="Paths to the grid file to use. There can be more than "
@@ -43,33 +44,32 @@ def parse_args():
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
+    p.add_argument("--gamma", type=float, default=0.99,
+                   help="Discount factor gamma.")
     
+    # Agent selection
     p.add_argument("--agent", type=str, default="vi",
                    help="Agent selection: vi (Value Iteration), mc (On Policy Monte Carlo), ql (Q-Learning).")
     
-    # Monte Carlo specific parameters
-    p.add_argument("--max_steps_per_episode", type=int, default=5000, # Safety limit
+    # Monte Carlo and Q-Learning shared parameters
+    p.add_argument("--max_steps_per_episode", type=int, default=5000,
                    help="Maximum steps allowed per episode.")
-    p.add_argument("--gamma", type=float, default=0.99, # Discount factor
-                   help="Discount factor gamma.")
-    p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
+    p.add_argument("--epsilon", type=float, default=1.0,
                    help="Initial exploration rate epsilon.")
-    p.add_argument("--min_epsilon", type=float, default=0.0005, # Minimum Epsilon
+    p.add_argument("--min_epsilon", type=float, default=0.0005,
                    help="Minimum exploration rate epsilon.")
-    p.add_argument("--epsilon_decay", type=float, default=0.9999, # Epsilon decay rate
+    p.add_argument("--epsilon_decay", type=float, default=0.9999,
                    help="Epsilon decay rate per episode.")
-    p.add_argument("--alpha", type=float, default=0.1, # Initial Alpha
+    p.add_argument("--alpha", type=float, default=0.1,
                    help="Initial learning rate alpha.")
-    p.add_argument("--min_alpha", type=float, default=0.00005, # Minimum Alpha
+    p.add_argument("--min_alpha", type=float, default=0.00005,
                    help="Minimum learning rate alpha.")
-    p.add_argument("--alpha_decay", type=float, default=0.9999, # Alpha decay rate
+    p.add_argument("--alpha_decay", type=float, default=0.9999,
                    help="Alpha decay rate per episode.")
+    
+    # Specific parameters
     p.add_argument("--early_stopping_patience_mc", type=int, default=1000,
                    help="Amount of episodes with the same policy that triggers early stopping.")
-    
-    # Q-Learning specific parameters
-    p.add_argument("--num_episodes", type=int, default=10_000,
-                   help="Number of episodes to train for.")
     p.add_argument("--early_stopping_patience_ql", type=int, default=50,
                    help="Amount of episodes with the same policy that triggers early stopping.")
     return p.parse_args()
@@ -96,7 +96,7 @@ def main_dispatcher():
         if agent == "vi":
             print("Using Value Iteration agent")
 
-            agent = ViAgent(gamma=0.9, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
+            agent = ViAgent(gamma=args.gamma, grid_size=env.grid.shape, reward=env.reward_fn, grid=env.grid, sigma=sigma)
 
             agent.train(env)
 
@@ -121,18 +121,20 @@ def main_dispatcher():
         
         elif agent == "ql":
             print("Using Q-Learning agent")
+            
+            agent = QLearningAgent(grid_shape = env.grid.shape,
+                                   grid_name = grid,
+                                   gamma = args.gamma,
+                                   initial_epsilon = args.epsilon,
+                                   min_epsilon = args.min_epsilon,
+                                   epsilon_decay = args.epsilon_decay,
+                                   initial_alpha = args.alpha,
+                                   min_alpha = args.min_alpha,
+                                   alpha_decay = args.alpha_decay,
+                                   max_steps_per_episode = args.max_steps_per_episode)
 
-            num_episodes = args.num_episodes
-            early_stopping_patience = args.early_stopping_patience_ql
 
-            # agent = QLearningAgent(env.grid, gamma=0.9)
-
-            agent = QLearningAgent(env.grid, gamma=0.9, grid_name=grid, stochasticity=sigma, 
-                            initial_epsilon=1.0,
-                            max_steps_per_episode=1000)
-
-
-            agent.train(env, num_episodes, iters, early_stopping_patience)
+            agent.train(env, iters, args.early_stopping_patience_ql)
 
             # Set the exploration rate to 0 for evaluation
             agent.epsilon = 0
