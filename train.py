@@ -39,7 +39,7 @@ def parse_args():
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
                         "no_gui is not set.")
-    p.add_argument("--iters", type=int, default=10000,
+    p.add_argument("--iters", type=int, default=100000,
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
@@ -48,7 +48,7 @@ def parse_args():
                    help="Agent selection: vi (Value Iteration), mc (On Policy Monte Carlo), ql (Q-Learning).")
     
     # Monte Carlo specific parameters
-    p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
+    p.add_argument("--max_steps_per_episode", type=int, default=5000, # Safety limit
                    help="Maximum steps allowed per episode.")
     p.add_argument("--gamma", type=float, default=0.99, # Discount factor
                    help="Discount factor gamma.")
@@ -56,15 +56,15 @@ def parse_args():
                    help="Initial exploration rate epsilon.")
     p.add_argument("--min_epsilon", type=float, default=0.0005, # Minimum Epsilon
                    help="Minimum exploration rate epsilon.")
-    p.add_argument("--epsilon_decay", type=float, default=0.999, # Epsilon decay rate
+    p.add_argument("--epsilon_decay", type=float, default=0.9999, # Epsilon decay rate
                    help="Epsilon decay rate per episode.")
     p.add_argument("--alpha", type=float, default=0.1, # Initial Alpha
                    help="Initial learning rate alpha.")
     p.add_argument("--min_alpha", type=float, default=0.00005, # Minimum Alpha
                    help="Minimum learning rate alpha.")
-    p.add_argument("--alpha_decay", type=float, default=1, # Alpha decay rate
+    p.add_argument("--alpha_decay", type=float, default=0.9999, # Alpha decay rate
                    help="Alpha decay rate per episode.")
-    p.add_argument("--early_stopping_patience_mc", type=int, default=500,
+    p.add_argument("--early_stopping_patience_mc", type=int, default=1000,
                    help="Amount of episodes with the same policy that triggers early stopping.")
     
     # Q-Learning specific parameters
