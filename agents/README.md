@@ -7,7 +7,7 @@ The algorithms that were implemented are:
 
 # Agents location
 
-2AMC15-2025-group7/
+2AMC15-2025-group/
 ├── agents/ # Contains implementations of different RL agents
 │ ├── init.py 
 │ ├── base_agent.py 
