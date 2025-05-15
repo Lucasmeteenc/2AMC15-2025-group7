@@ -58,6 +58,12 @@ def parse_args():
                    help="Minimum exploration rate epsilon.")
     p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
                    help="Epsilon decay rate per episode.")
+    p.add_argument("--alpha", type=float, default=1.0, # Initial Alpha
+                   help="Initial learning rate alpha.")
+    p.add_argument("--min_alpha", type=float, default=0.0005, # Minimum Alpha
+                   help="Minimum learning rate alpha.")
+    p.add_argument("--alpha_decay", type=float, default=0.99, # Alpha decay rate
+                   help="Alpha decay rate per episode.")
     p.add_argument("--early_stopping_patience_mc", type=int, default=250,
                    help="Amount of episodes with the same policy that triggers early stopping.")
     
@@ -131,24 +137,18 @@ def main_dispatcher():
         elif agent == "mc":
             print("Using On Policy Monte Carlo agent")
 
-            gamma = args.gamma
-            epsilon = args.epsilon
-            min_epsilon = args.min_epsilon
-            epsilon_decay = args.epsilon_decay
-            max_steps_per_episode = args.max_steps_per_episode
-            early_stopping_patience = args.early_stopping_patience_mc
-
-            grid_shape = env.grid.shape
-
-            agent = MonteCarloAgent(grid_shape=grid_shape,
-                                    grid_name=grid,
-                                    gamma=gamma,
-                                    initial_epsilon=epsilon,
-                                    min_epsilon=min_epsilon,
-                                    epsilon_decay=epsilon_decay,
-                                    max_steps_per_episode=max_steps_per_episode)
+            agent = MonteCarloAgent(grid_shape = env.grid.shape,
+                                    grid_name = grid,
+                                    gamma = args.gamma,
+                                    initial_epsilon = args.epsilon,
+                                    min_epsilon = args.min_epsilon,
+                                    epsilon_decay = args.epsilon_decay,
+                                    initial_alpha = args.alpha,
+                                    min_alpha = args.min_alpha,
+                                    alpha_decay = args.alpha_decay,
+                                    max_steps_per_episode = args.max_steps_per_episode)
         
-            agent.train(env, iters, max_steps_per_episode, early_stopping_patience)
+            agent.train(env, iters, args.early_stopping_patience_mc)
 
             # Set the exploration rate to 0 for evaluation
             agent.epsilon = 0

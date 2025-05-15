@@ -5,7 +5,8 @@ from world import Environment
 from tqdm import trange
 
 class MonteCarloAgent(BaseAgent):
-    def __init__(self, grid_shape, grid_name: str, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999, stochasticity=-1, max_steps_per_episode=-1, reward_function="Default"):
+    def __init__(self, grid_shape, grid_name: str, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999, 
+                 initial_alpha=1.0, min_alpha=0.01, alpha_decay=0.999, stochasticity=-1, max_steps_per_episode=-1, reward_function="Default"):
         """
         Initialize the Monte Carlo Agent.
 
@@ -16,27 +17,37 @@ class MonteCarloAgent(BaseAgent):
             initial_epsilon (float): Starting value for epsilon (exploration rate).
             min_epsilon (float): Minimum value for epsilon.
             epsilon_decay (float): Factor to decay epsilon by each episode.
+            initial_alpha (float): Starting value for alpha (exploration rate).
+            min_alpha (float): Minimum value for alpha.
+            alpha_decay (float): Factor to decay alpha by each episode.
         """
         super().__init__()
         
         self.grid_height, self.grid_width = grid_shape
         self.num_actions = num_actions
         self.gamma = gamma
+
+        # Epsilon parameters
         self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
         self.epsilon_decay = epsilon_decay
         self.initial_epsilon = initial_epsilon
 
+        # Alpha parameters
+        self.alpha = initial_alpha
+        self.min_alpha = min_alpha
+        self.alpha_decay = alpha_decay
+        self.initial_alpha = initial_alpha
+
         # Initialize Q-table and Visit Counts
         self.Q = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
-        self.N_visits = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.uint32)
-        self.last_used_alpha = -1
 
         # Initialize old Q-Table and old V to compute convergence speed later
         self.Q_old = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
         self.V_old = np.max(self.Q, axis=2)
 
-        self.episode_experience = [] 
+        self.episode_experience = []
+        self.max_steps_per_episode = max_steps_per_episode
         
         self._set_parameters("Monte Carlo", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
 
@@ -64,6 +75,13 @@ class MonteCarloAgent(BaseAgent):
         """
         if self.epsilon > self.min_epsilon:
             self.epsilon *= self.epsilon_decay
+
+    def update_alpha(self):
+        """
+        Update the learning rate (alpha) after each episode.
+        """
+        if self.alpha > self.min_alpha:
+            self.alpha *= self.alpha_decay
 
     def update(self, state, reward, action):
         """
@@ -97,16 +115,10 @@ class MonteCarloAgent(BaseAgent):
 
             # Update return
             G = self.gamma * G + reward
-
-            # Every Visit MC Update
-            self.N_visits[row, col, action] += 1
-            
-            alpha = 1.0 / (self.N_visits[row, col, action]**0.5)
-            self.last_used_alpha = alpha
             
             # Update Q-value
             current_q = self.Q[row, col, action]
-            self.Q[row, col, action] = current_q + alpha * (G - current_q)
+            self.Q[row, col, action] = current_q + self.alpha * (G - current_q)
 
     def get_policy(self):
         """
@@ -161,15 +173,14 @@ class MonteCarloAgent(BaseAgent):
 
         print("-" * (H * 2 + 1))
 
-    def train(self, env: Environment, num_episodes: int, max_steps_per_episode: int,
-                    early_stopping_patience: int):
+    def train(self, env: Environment, num_episodes: int, early_stopping_patience: int):
         
         print(f"\n--- Training Monte Carlo Agent on Grid: {env.grid_fp.name} ---")
 
         # Reset variables as safety measure
         self.Q.fill(0)
-        self.N_visits.fill(0)
         self.epsilon = self.initial_epsilon
+        self.alpha = self.initial_alpha
 
         init_grid_for_policy_print = np.copy(env.grid)
 
@@ -179,7 +190,6 @@ class MonteCarloAgent(BaseAgent):
 
         converged = False
         
-
         # Main training loop 
         for episode in trange(num_episodes, desc=f"MC Training on {env.grid_fp.name}"):
             state = env.reset()
@@ -191,7 +201,7 @@ class MonteCarloAgent(BaseAgent):
             self.Q_old = np.copy(self.Q)
 
             # Generate an episode of experience
-            while not terminated and steps_in_episode < max_steps_per_episode:
+            while not terminated and steps_in_episode < self.max_steps_per_episode:
                 # Agent takes an action based on the current state and policy
                 action = self.take_action(state)
 
@@ -211,6 +221,9 @@ class MonteCarloAgent(BaseAgent):
             # Update the exploration rate (epsilon)
             self.update_epsilon()
 
+            # Update the learning rate (alpha)
+            self.update_alpha()
+
             new_policy = self.get_policy()
             if np.array_equal(new_policy, old_policy):
                 same_policy_count += 1
@@ -222,8 +235,8 @@ class MonteCarloAgent(BaseAgent):
             old_policy = new_policy.copy()
             
             # if self.episode % 100 == 0:
-            conv_metricV,conv_metricQ = self.get_convergence_metric()
-            self.log_metrics(env.world_stats["cumulative_reward"], self.last_used_alpha, self.epsilon,conv_metricV,conv_metricQ)
+            conv_metricV, conv_metricQ = self.get_convergence_metric()
+            self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon, conv_metricV, conv_metricQ)
             self.episode += 1
 
         if converged:
