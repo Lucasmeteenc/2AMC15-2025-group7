@@ -102,7 +102,7 @@ def run_train_loop(agent, grid, no_gui, num_episodes, fps, sigma, gamma, epsilon
                                 stochasticity=sigma,
                                 max_steps_per_episode=max_steps_per_episode)
     
-        agent.train(env, num_episodes, max_steps_per_episode, early_stopping_patience)
+        agent.train(env, num_episodes, early_stopping_patience)
 
         # Set the exploration rate to 0 for evaluation
         agent.epsilon = 0
@@ -156,7 +156,7 @@ def main_dispatcher():
     default_values = {
         'vi': {
             'sigma': 0.1,
-            'gamma': 0.9,
+            'gamma': 0.95,
             'epsilon': -1,
             'min_epsilon': -1,
             'epsilon_decay': -1,
@@ -166,7 +166,7 @@ def main_dispatcher():
         },
         'mc': {
             'sigma': 0.1,
-            'gamma': 0.9,
+            'gamma': 0.95,
             'epsilon': 1.0,
             'min_epsilon': 0.01,
             'epsilon_decay': 0.9997,
@@ -176,7 +176,7 @@ def main_dispatcher():
         },
         'ql': {
             'sigma': 0.1,
-            'gamma': 0.9,
+            'gamma': 0.95,
             'epsilon': 1.0,
             'min_epsilon': -1,
             'epsilon_decay': -1,
@@ -188,12 +188,12 @@ def main_dispatcher():
 
     # Define values to test for different parameters
     values_to_test = {
-        'sigma': [0.0, 0.1, 0.3, 0.5],
+        'sigma': [0.01, 0.05, 0.1, 0.3],
         'gamma': [0.4, 0.8, 0.9, 0.95, 0.99],
-        'epsilon': [1.0, 0.7, 0.3, 0.1],
-        'num_episodes': [500, 1000, 5000, 10000],
-        'max_steps_per_episode': [100, 250, 500, 1000],
-        'early_stopping_patience': [50, 100, 250, 500, 1000]
+        # 'epsilon': [1.0, 0.7, 0.3, 0.1],
+        # 'num_episodes': [500, 1000, 5000, 10000],
+        # 'max_steps_per_episode': [100, 250, 500, 1000],
+        # 'early_stopping_patience': [50, 100, 250, 500, 1000]
     }
 
     # Number of runs

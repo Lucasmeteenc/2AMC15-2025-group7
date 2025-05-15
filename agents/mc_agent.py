@@ -107,6 +107,8 @@ class MonteCarloAgent(BaseAgent):
 
         episode_experience = self.episode_experience
 
+        visited = set()
+
         G = 0
         # Loop backward through the episode
         for t in range(len(episode_experience) - 1, -1, -1):
@@ -115,10 +117,13 @@ class MonteCarloAgent(BaseAgent):
 
             # Update return
             G = self.gamma * G + reward
-            
-            # Update Q-value
-            current_q = self.Q[row, col, action]
-            self.Q[row, col, action] = current_q + self.alpha * (G - current_q)
+
+            if (state, action) not in visited:
+                # Update Q-value
+                current_q = self.Q[row, col, action]
+                self.Q[row, col, action] = current_q + self.alpha * (G - current_q)
+
+                visited.add((state, action))
 
     def get_policy(self):
         """
