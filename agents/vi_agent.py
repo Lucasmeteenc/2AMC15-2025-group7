@@ -1,17 +1,18 @@
 """vi Agent.
 
-This is an agent that takes the action wich maximizes the value of the value function.
+This is an agent that takes the action which maximizes the value of the value function.
 """
 import numpy as np
 
 from world.grid import Grid
 from agents import BaseAgent
 from world.helpers import action_to_direction
-
+from tqdm import trange
+from world.environment import Environment
 
 class ViAgent(BaseAgent):
     """Agent that performs Value Iteration to find optimal policy."""
-    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, gamma: float = 0.9, sigma: float = 0.1):
+    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, grid_name="grid_configs/A1_grid.npy", gamma: float = 0.9, sigma: float = 0.1, reward_function="Default"):
         super().__init__()
         
         self.grid_size = grid_size
@@ -25,6 +26,8 @@ class ViAgent(BaseAgent):
         
         # Initialize the value function see function description for why not used
         # self.initialize_values()
+        self._set_parameters("Value Iteration", stochasticity=sigma, discount_factor=gamma, grid_name=grid_name, reward_function=reward_function)
+
     
     def initialize_values(self):
         """Initialize the value function based on grid information."""
@@ -100,6 +103,11 @@ class ViAgent(BaseAgent):
         
         for a in self.actions:
             next_state = tuple(np.add(state, action_to_direction(a)))
+
+            # Out of bounds check
+            if 0 > next_state[0] or next_state[0] >= self.grid_size[0] or 0 > next_state[1] or next_state[1] >= self.grid_size[1]:
+                continue
+
             r = self.reward_fn(self.grid, next_state)
             value = r + self.gamma * self.V[next_state]
             if value > best_value:
@@ -176,3 +184,44 @@ class ViAgent(BaseAgent):
 
         # print(found_policy)
         print("-" * (H * 2 + 1))
+
+    # Evaluate the current policy.
+    def evaluate_current_policy(self, env: Environment):
+        policy = self.get_policy()
+
+        terminated = False
+        i = 0
+        while not terminated and i < 1000:  # i serves as failsafe if policy has infinite loop
+            action = policy[env.agent_pos]
+            state, reward, terminated, info = env.step(action)
+            i+=1
+        
+        reward = env.world_stats["cumulative_reward"]
+
+        env.reset()
+        return reward
+
+    def train(self, env: Environment):
+        delta = float('inf')
+        max_iterations = 1000
+        
+        for iteration in trange(max_iterations):
+            # Run one sweep of value iteration
+            delta = self.value_iteration()
+            
+            # Check for convergence
+            if delta < self.theta:
+                break
+                
+            # Safety check
+            if iteration >= max_iterations - 1:
+                print("Warning: Value Iteration did not converge within maximum iterations")
+
+            # if self.step % 20 == 0:
+            self.log_metrics(self.evaluate_current_policy(env),conv_metricV=delta)
+            self.step += 1
+            self.episode += 1
+
+        # self.log_metrics(self.evaluate_current_policy(env))
+        
+        self.print_policy(np.copy(env.grid))

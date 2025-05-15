@@ -238,4 +238,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-results
+results.csv
