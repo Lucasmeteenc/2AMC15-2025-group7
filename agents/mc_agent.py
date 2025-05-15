@@ -241,6 +241,7 @@ class MonteCarloAgent(BaseAgent):
 
         if converged:
             print(f"\nMC Policy converged after {episode + 1} episodes.")
+        print(f"Learnign rate: {self.alpha:.4f}, Epsilon: {self.epsilon:.4f}")
         
         print("\n--- MC Training completed ---")
         self.print_policy(init_grid_for_policy_print)

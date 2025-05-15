@@ -86,6 +86,8 @@ class QLearningAgent(BaseAgent):
 
             self.Q_table_old = np.copy(self.Q_table)
 
+            init_grid_for_policy_print = np.copy(env.grid)
+
             for _ in range(iters):
                 
                 # Agent takes an action based on the latest observation and info.
@@ -116,7 +118,8 @@ class QLearningAgent(BaseAgent):
                 print(f"Early exit after {episode} episodes.")
                 break
 
-        print(f"{np.argmax(self.Q_table, axis=2)=}")
+        # print(f"{np.argmax(self.Q_table, axis=2)=}")
+        self.print_policy(init_grid_for_policy_print)
 
 
     def get_convergence_metric(self):
@@ -133,3 +136,56 @@ class QLearningAgent(BaseAgent):
         max_diff_Q = np.max(abs_diff) # compute max difference between Q-tables
 
         return max_diff_V, max_diff_Q
+    
+    def get_policy(self):
+        """
+        Extract the policy from the Q-table.
+
+        Returns:
+            np.ndarray: The policy (best action for each state).
+        """
+        return np.argmax(self.Q_table, axis=2)
+    
+    def print_policy(self, init_grid):
+        """
+        Print the policy in a human-readable format.
+
+        Args:
+            init_grid (np.ndarray): The grid environment.
+        """
+        print("\nPolicy (best action for each state):")
+        found_policy = self.get_policy()
+        H, W = found_policy.shape
+
+        action_symbols = {
+            0: '↓',  # Down
+            1: '↑',  # Up
+            2: '←',  # Left
+            3: '→'   # Right
+        }
+        wall_symbol = '#'
+
+        WALL_VALUE = 1
+        OBSTACLE_VALUE = 2
+        TARGET_VALUE = 3
+
+        print("-" * (H * 2 + 1))
+
+        # Print the transposed policy row by row
+        for r_vis in range(W):
+            row_str = "|"
+            for c_vis in range(H):
+                original_row = c_vis
+                original_col = r_vis
+
+                if init_grid[original_row, original_col] == WALL_VALUE or init_grid[original_row, original_col] == OBSTACLE_VALUE:
+                    row_str += wall_symbol + " "
+                elif init_grid[original_row, original_col] == TARGET_VALUE:
+                    row_str += "T" + " "
+                else:
+                    action = found_policy[original_row, original_col]
+                    row_str += action_symbols.get(action, '?') + " "
+            row_str += "|"
+            print(row_str)
+
+        print("-" * (H * 2 + 1))

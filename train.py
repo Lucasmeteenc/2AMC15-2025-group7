@@ -39,7 +39,7 @@ def parse_args():
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
                         "no_gui is not set.")
-    p.add_argument("--iters", type=int, default=1000,
+    p.add_argument("--iters", type=int, default=10000,
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
@@ -58,11 +58,11 @@ def parse_args():
                    help="Minimum exploration rate epsilon.")
     p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
                    help="Epsilon decay rate per episode.")
-    p.add_argument("--alpha", type=float, default=1.0, # Initial Alpha
+    p.add_argument("--alpha", type=float, default=0.5, # Initial Alpha
                    help="Initial learning rate alpha.")
-    p.add_argument("--min_alpha", type=float, default=0.0005, # Minimum Alpha
+    p.add_argument("--min_alpha", type=float, default=0.00005, # Minimum Alpha
                    help="Minimum learning rate alpha.")
-    p.add_argument("--alpha_decay", type=float, default=0.99, # Alpha decay rate
+    p.add_argument("--alpha_decay", type=float, default=0.9995, # Alpha decay rate
                    help="Alpha decay rate per episode.")
     p.add_argument("--early_stopping_patience_mc", type=int, default=250,
                    help="Amount of episodes with the same policy that triggers early stopping.")
