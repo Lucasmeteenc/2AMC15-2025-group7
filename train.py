@@ -54,17 +54,17 @@ def parse_args():
                    help="Discount factor gamma.")
     p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
                    help="Initial exploration rate epsilon.")
-    p.add_argument("--min_epsilon", type=float, default=0.05, # Minimum Epsilon
+    p.add_argument("--min_epsilon", type=float, default=0.0005, # Minimum Epsilon
                    help="Minimum exploration rate epsilon.")
-    p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
+    p.add_argument("--epsilon_decay", type=float, default=0.999, # Epsilon decay rate
                    help="Epsilon decay rate per episode.")
-    p.add_argument("--alpha", type=float, default=0.5, # Initial Alpha
+    p.add_argument("--alpha", type=float, default=0.1, # Initial Alpha
                    help="Initial learning rate alpha.")
     p.add_argument("--min_alpha", type=float, default=0.00005, # Minimum Alpha
                    help="Minimum learning rate alpha.")
-    p.add_argument("--alpha_decay", type=float, default=0.9995, # Alpha decay rate
+    p.add_argument("--alpha_decay", type=float, default=1, # Alpha decay rate
                    help="Alpha decay rate per episode.")
-    p.add_argument("--early_stopping_patience_mc", type=int, default=250,
+    p.add_argument("--early_stopping_patience_mc", type=int, default=500,
                    help="Amount of episodes with the same policy that triggers early stopping.")
     
     # Q-Learning specific parameters
@@ -73,40 +73,6 @@ def parse_args():
     p.add_argument("--early_stopping_patience_ql", type=int, default=50,
                    help="Amount of episodes with the same policy that triggers early stopping.")
     return p.parse_args()
-
-
-def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
-         sigma: float, random_seed: int):
-    """Main loop of the program."""
-
-    for grid in grid_paths:
-        
-        # Set up the environment
-        env = Environment(grid, no_gui,sigma=sigma, target_fps=fps, 
-                          random_seed=random_seed)
-        
-        # Initialize agent
-        agent = RandomAgent()
-        
-        # Always reset the environment to initial state
-        state = env.reset()
-        for _ in trange(iters):
-            
-            # Agent takes an action based on the latest observation and info.
-            action = agent.take_action(state)
-
-            # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
-            
-            # If the final state is reached, stop.
-            if terminated:
-                break
-
-            agent.update(state, reward, info["actual_action"])
-
-        # Evaluate the agent
-        Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
-
 
 def main_dispatcher():
     args = parse_args()
