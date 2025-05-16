@@ -158,13 +158,13 @@ def main_dispatcher():
     values_to_test = {
         'sigma': [0.0, 0.05, 0.1, 0.3],
         'gamma': [0.6, 0.8, 0.9, 0.95, 0.99],
-        'initial_alpha': [0.01, 0.05, 0.1, 0.5, 1],
-        'epsilon_decay': [0.95, 0.975, 0.99, 0.999, 0.9999],
+        'initial_alpha': [0.01, 0.1, 0.5, 1, 2],
+        'epsilon_decay': [0.9, 0.95, 0.99, 0.999, 0.9999],
         'max_steps_per_episode': [100, 250, 500, 1000],
     }
 
     # Number of runs
-    num_runs = 10
+    num_runs = 3
     
     # Create task list for parallel execution
     all_tasks = []
