@@ -4,9 +4,15 @@ import numpy as np
 
 # Used claude.ai to quickly iteration on and improve the function
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Used claude.ai to quickly iteration on and improve the function
+
 def create_algorithm_comparison_plots(df, x_param, x_values, algorithms, 
                                      title, x_label, fixed_params=None,
-                                     colors=None, figsize=(15, 6),
+                                     colors=None, figsize=(15, 3),
                                      use_log_scale=True, save_path=None,
                                      conv_threshold=0.01, percentile_range=75):
     """
@@ -54,17 +60,19 @@ def create_algorithm_comparison_plots(df, x_param, x_values, algorithms,
         fixed_params = {}
     
     fig, axes = plt.subplots(1, 2, figsize=figsize)
-    fig.suptitle(f"{title}", fontsize=16)
+
+    axis_label_fontsize = 14
+    subplot_title_fontsize = 18
     
-    axes[0].set_title(f"Convergence Speed (Threshold = {conv_threshold})")
-    axes[0].set_xlabel(x_label)
-    axes[0].set_ylabel("Iterations to Converge (steps)")
+    axes[0].set_title(f"Convergence Speed (Threshold = {conv_threshold})", fontsize=subplot_title_fontsize)
+    axes[0].set_xlabel(x_label, fontsize=axis_label_fontsize)
+    axes[0].set_ylabel("Iterations to Converge", fontsize=axis_label_fontsize)
     if use_log_scale:
         axes[0].set_yscale('log')
     
-    axes[1].set_title("Final Policy Quality")
-    axes[1].set_xlabel(x_label)
-    axes[1].set_ylabel("Cumulative Reward")
+    axes[1].set_title("Final Policy Quality", fontsize=subplot_title_fontsize)
+    axes[1].set_xlabel(x_label, fontsize=axis_label_fontsize)
+    axes[1].set_ylabel("Cumulative Reward", fontsize=axis_label_fontsize)
     
     # Define percentile calculation for error bands
     def get_percentile_bounds(data):        
@@ -172,10 +180,11 @@ def create_algorithm_comparison_plots(df, x_param, x_values, algorithms,
     
     return fig
 
-# Plotting the effect of stochasticity and discount factor
-df = pd.read_csv("evaluate/results.csv", sep=",")
+
+df = pd.read_csv("evaluate/results_FIN_SIGMA.csv", sep=",")
 algorithms = ["Value Iteration", "Monte Carlo", "Q learning"]
-stochasticity_values = [0.01, 0.05, 0.1, 0.3]
+
+stochasticity_values = [0.0, 0.05, 0.1, 0.3]
 fig1 = create_algorithm_comparison_plots(
     df=df,
     x_param="stochasticity",
@@ -183,11 +192,14 @@ fig1 = create_algorithm_comparison_plots(
     algorithms=algorithms,
     title="Effect of Stochasticity (σ) on Algorithm Performance",
     x_label="Stochasticity (σ)",
-    fixed_params={"discount_factor": 0.95},
+    fixed_params={"discount_factor": 0.99},
     save_path="evaluate/sigma_comparison.svg"
 )
 
-gamma_values = [0.4, 0.8, 0.9, 0.95, 0.99]
+df = pd.read_csv("evaluate/results_FIN_GAMMA.csv", sep=",")
+algorithms = ["Value Iteration", "Monte Carlo", "Q learning"]
+
+gamma_values = [0.6, 0.8, 0.9, 0.95, 0.99]
 fig2 = create_algorithm_comparison_plots(
     df=df,
     x_param="discount_factor",
@@ -199,9 +211,9 @@ fig2 = create_algorithm_comparison_plots(
     save_path="evaluate/gamma_comparison.svg"
 )
 
-# Plotting the effect of initial learning rate
-df = pd.read_csv("evaluate/results.csv", sep=",")
+df = pd.read_csv("evaluate/results_FIN_ALPHA.csv", sep=",")
 algorithms = ["Monte Carlo", "Q learning"]
+
 initial_alpha = [0.01, 0.1, 0.5, 1, 2]
 
 fig1 = create_algorithm_comparison_plots(
@@ -212,12 +224,13 @@ fig1 = create_algorithm_comparison_plots(
     title="Effect of Initial Learning Rate (α₀) on Performance",
     x_label="Initial Learning Rate (α₀)",
     fixed_params=None,
-    save_path="alpha_comparison.svg",
+    save_path="evaluate/alpha_comparison.svg",
     use_log_scale=True
 )
 
-# Plotting the effect of epsilon decay
-df = pd.read_csv("evaluate/results.csv", sep=",")
+df = pd.read_csv("evaluate/results_FIN_EPSILON.csv", sep=",")
+algorithms = ["Monte Carlo", "Q learning"]
+
 epsilon_decay = [0.9, 0.95, 0.99, 0.999, 0.9999]
 
 fig1 = create_algorithm_comparison_plots(
@@ -229,5 +242,22 @@ fig1 = create_algorithm_comparison_plots(
     x_label="Epsilon Decay Rate (per episode)",
     fixed_params=None,
     save_path="evaluate/epsilon_comparison.svg",
+    use_log_scale=True
+)
+
+df = pd.read_csv("evaluate/results_FIN_MAX_STEPS.csv", sep=",")
+algorithms = ["Monte Carlo", "Q learning"]
+
+max_steps_per_episode = [100, 250, 500, 1000]
+
+fig1 = create_algorithm_comparison_plots(
+    df=df,
+    x_param="episode_length_mc",
+    x_values=max_steps_per_episode,
+    algorithms=algorithms,
+    title="Effect of Epsilon Decay Rate (ε-decay) on Performance",
+    x_label="Maximum Steps per Episode",
+    fixed_params=None,
+    save_path="evaluate/episode_length_comparison.svg",
     use_log_scale=True
 )
