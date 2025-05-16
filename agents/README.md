@@ -7,26 +7,27 @@ The algorithms that were implemented are:
 
 ### Agents location
 
+```text
 2AMC15-2025-group/
-├── agents/ # Contains implementations of different RL agents..
-│ ├── init.py..
-│ ├── base_agent.py..
-│ ├── `mc_agent.py` # On-Policy Monte Carlo Control agent..
-│ ├── `vi_agent.py` # Value Iteration agent..
-│ ├── `q_learning_agent.py` # Q-Learning agent using ε-greedy strategy..
-│ ├── random_agent.py..
-│ ├── null_agent.py..
+└─ agents/ # Contains implementations of different RL agents
+   ├─ init.py
+   ├─ base_agent.py
+   ├─ `mc_agent.py`         # On-Policy Monte Carlo Control agent
+   ├─ `vi_agent.py`         # Value Iteration agent
+   ├─ `q_learning_agent.py` # Q-Learning
+   ├─ random_agent.py
+   └─ null_agent.py
+```
 
+Example run with default values:
 
-Example run with default values
-
-# Run Value Iteration
+## Run Value Iteration
 python train.py ./grid_configs/A1_grid.npy --agent=vi --no_gui
 
-# Run Q-learning
+## Run Q-learning
 python train.py ./grid_configs/A1_grid.npy --agent=ql --no_gui
 
-# Run Monte Carlo
+## Run Monte Carlo
 python train.py ./grid_configs/A1_grid.npy --agent=mc --no_gui
 
 Below is a list of command-line options supported by `train.py`.
