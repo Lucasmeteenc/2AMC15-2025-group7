@@ -1,7 +1,3 @@
-"""
-Train your RL Agent in this file. 
-"""
-
 from argparse import ArgumentParser
 from pathlib import Path
 import multiprocessing as mp
@@ -40,7 +36,7 @@ def parse_args():
 
 
 def run_train_loop(agent, grid, no_gui, num_episodes, fps, sigma, gamma, epsilon, min_epsilon, epsilon_decay, max_steps_per_episode, early_stopping_patience_mc, early_stopping_patience_ql, alpha, min_alpha, alpha_decay, run_id):
-    # Define random seed such that each loop is different.
+    # Define random seed such that each loop is different
     random_seed = hash(f"{agent}_{grid}_{sigma}_{gamma}_{run_id}") % 1000000
 
     
@@ -62,16 +58,16 @@ def run_train_loop(agent, grid, no_gui, num_episodes, fps, sigma, gamma, epsilon
         print("Using On Policy Monte Carlo agent")
 
         agent = MonteCarloAgent(grid_shape = env.grid.shape,
-                                    grid_name = grid,
-                                    gamma = gamma,
-                                    stochasticity=sigma,
-                                    initial_epsilon = epsilon,
-                                    min_epsilon = min_epsilon,
-                                    epsilon_decay = epsilon_decay,
-                                    initial_alpha = alpha,
-                                    min_alpha = min_alpha,
-                                    alpha_decay = alpha_decay,
-                                    max_steps_per_episode = max_steps_per_episode)
+                                grid_name = grid,
+                                gamma = gamma,
+                                stochasticity=sigma,
+                                initial_epsilon = epsilon,
+                                min_epsilon = min_epsilon,
+                                epsilon_decay = epsilon_decay,
+                                initial_alpha = alpha,
+                                min_alpha = min_alpha,
+                                alpha_decay = alpha_decay,
+                                max_steps_per_episode = max_steps_per_episode)
         
         agent.train(env, num_episodes, early_stopping_patience_mc)
 
@@ -82,16 +78,16 @@ def run_train_loop(agent, grid, no_gui, num_episodes, fps, sigma, gamma, epsilon
         print("Using Q-Learning agent")
 
         agent = QLearningAgent(grid_shape = env.grid.shape,
-                                   grid_name = grid,
-                                   gamma = gamma,
-                                   stochasticity=sigma,
-                                   initial_epsilon = epsilon,
-                                   min_epsilon = min_epsilon,
-                                   epsilon_decay = epsilon_decay,
-                                   initial_alpha = alpha,
-                                   min_alpha = min_alpha,
-                                   alpha_decay = alpha_decay,
-                                   max_steps_per_episode = max_steps_per_episode)
+                               grid_name = grid,
+                               gamma = gamma,
+                               stochasticity=sigma,
+                               initial_epsilon = epsilon,
+                               min_epsilon = min_epsilon,
+                               epsilon_decay = epsilon_decay,
+                               initial_alpha = alpha,
+                               min_alpha = min_alpha,
+                               alpha_decay = alpha_decay,
+                               max_steps_per_episode = max_steps_per_episode)
 
         agent.train(env, num_episodes, early_stopping_patience_ql)
 
@@ -196,7 +192,7 @@ def main_dispatcher():
 
 
                 if agent != "vi":
-                    # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
+                    # Episode length
                     for mod_max_steps_per_episode in values_to_test['max_steps_per_episode']:
                         all_tasks.append((
                             agent, grid, no_gui, default_values[agent]['num_episodes'], 
