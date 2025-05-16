@@ -40,7 +40,7 @@ def parse_args():
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
                         "no_gui is not set.")
-    p.add_argument("--iters", type=int, default=100000,
+    p.add_argument("--iters", type=int, default=50_000,
                    help="Number of iterations to go through.")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
@@ -58,7 +58,7 @@ def parse_args():
                    help="Initial exploration rate epsilon.")
     p.add_argument("--min_epsilon", type=float, default=0.0005,
                    help="Minimum exploration rate epsilon.")
-    p.add_argument("--epsilon_decay", type=float, default=0.9999,
+    p.add_argument("--epsilon_decay", type=float, default=0.999,
                    help="Epsilon decay rate per episode.")
     p.add_argument("--alpha", type=float, default=0.1,
                    help="Initial learning rate alpha.")

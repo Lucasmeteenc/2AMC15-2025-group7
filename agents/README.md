@@ -40,7 +40,7 @@ Below is a list of command-line options supported by `train.py`.
 | `--no_gui`                | flag     | False   | Disables GUI rendering to speed up training. |
 | `--sigma`                 | `float`  | 0.1     | Controls stochasticity of the environment. |
 | `--fps`                   | `int`    | 30      | Frames per second for rendering (ignored if `--no_gui` is set). |
-| `--iters`                 | `int`    | 100000  | Number of iterations (VI) or episodes (MC/QL). |
+| `--iters`                 | `int`    | 50000   | Number of iterations (VI) or episodes (MC/QL). |
 | `--random_seed`           | `int`    | 0       | Random seed for reproducibility. |
 | `--gamma`                 | `float`  | 0.99    | Discount factor for future rewards. |
 
@@ -55,16 +55,16 @@ Below is a list of command-line options supported by `train.py`.
 | Argument                       | Type     | Default | Description |
 |--------------------------------|----------|---------|-------------|
 | `--max_steps_per_episode`      | `int`    | 5000    | Max steps allowed per episode (safety cap). |
-| `--epsilon`                   | `float`  | 1.0     | Initial exploration rate. |
-| `--min_epsilon`               | `float`  | 0.0005  | Minimum exploration rate. |
-| `--epsilon_decay`             | `float`  | 0.9999  | Epsilon decay rate per episode. |
+| `--epsilon`                    | `float`  | 1.0     | Initial exploration rate. |
+| `--min_epsilon`                | `float`  | 0.0005  | Minimum exploration rate. |
+| `--epsilon_decay`              | `float`  | 0.999   | Epsilon decay rate per episode. |
 
 ### Specific parameters
 
 | Argument                       | Type     | Default | Description |
 |--------------------------------|----------|---------|-------------|
-| `--early_stopping_patience_mc`| `int`    | 1000    | Stop if policy remains unchanged for this many episodes. |
-| `--early_stopping_patience_ql`| `int`    | 50      | Stop if policy remains unchanged for this many episodes. |
+| `--early_stopping_patience_mc` | `int`    | 1000    | Stop if policy remains unchanged for this many episodes.|
+| `--early_stopping_patience_ql` | `int`    | 50      | Stop if policy remains unchanged for this many episodes.|
 
 ### Experiments reproduction
 
