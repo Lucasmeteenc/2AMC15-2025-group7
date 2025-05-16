@@ -246,7 +246,7 @@ max_steps_per_episode = [100, 250, 500, 1000]
 
 fig1 = create_algorithm_comparison_plots(
     df=df,
-    x_param="episode_length_mc",
+    x_param="episode_length",
     x_values=max_steps_per_episode,
     algorithms=algorithms,
     title="Effect of Epsilon Decay Rate (ε-decay) on Performance",
@@ -263,7 +263,7 @@ max_steps_per_episode = [100, 250, 500, 1000]
 
 fig3 = create_algorithm_comparison_plots(
     df=df,
-    x_param="episode_length_mc",
+    x_param="episode_length",
     x_values=max_steps_per_episode,
     algorithms=algorithms,
     title="Effect of Episode length on Algorithm Performance",
