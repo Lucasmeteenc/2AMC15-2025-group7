@@ -55,7 +55,8 @@ class MonteCarloAgent(BaseAgent):
                              grid_name=grid_name, 
                              episode_length_mc=max_steps_per_episode, 
                              reward_function=reward_function, 
-                             initial_alpha=initial_alpha)
+                             initial_alpha=initial_alpha,
+                             epsilon_decay=epsilon_decay)
 
     def take_action(self, state: tuple[int, int]) -> int:
         """

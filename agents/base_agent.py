@@ -60,7 +60,8 @@ class BaseAgent():
             self.episode,
             conv_metricV,
             conv_metricQ,
-            self.initial_alpha
+            self.initial_alpha,
+            self.epsilon_decay
         ]
 
         # Use file lock to prevent concurrent writes
@@ -76,7 +77,8 @@ class BaseAgent():
                     header = [
                         'run_id', 'algorithm', 'stochasticity', 'discount_factor', 'learning_rate',
                         'epsilon', 'episode_length_mc', 'grid_name', 'reward_function', 
-                        'cumulative_reward', 'step', 'episode', 'conv_metricV', 'conv_metricQ', 'initial_alpha'
+                        'cumulative_reward', 'step', 'episode', 'conv_metricV', 'conv_metricQ', 
+                        'initial_alpha', 'epsilon_decay'
                     ]
                     writer.writerow(header)
 
@@ -94,6 +96,7 @@ class BaseAgent():
         reward_function="Default",
         logging_file_path:str = None,
         initial_alpha: float = -1.0,
+        epsilon_decay: float = -1.0,
     ):
         """Sets the parameters for logging. If a value is not relevant. Set it to -1.0 for floats, or None for strings
 
@@ -108,6 +111,7 @@ class BaseAgent():
             reward_function (str, optional): _description_. Defaults to "Default".
             logging_file_path (str, optional): _description_. Defaults to None.
             initial_alpha (float, optional): _description_. Defaults to -1.0.
+            epsilon_decay (float, optional): _description_. Defaults to -1.0.
 
         Raises:
             NotImplementedError: _description_
@@ -127,6 +131,7 @@ class BaseAgent():
         self.episode_length_mc = episode_length_mc
         self.reward_function = reward_function
         self.initial_alpha = initial_alpha
+        self.epsilon_decay = epsilon_decay
         
         if logging_file_path:
             self.logging_file_path = logging_file_path
