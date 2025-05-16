@@ -46,6 +46,8 @@ Below is a list of command-line options supported by `train.py`.
 
 ### Agent selection
 
+| Argument                  | Type     | Default | Description |
+|---------------------------|----------|---------|-------------|
 | `--agent`                 | `str`    | "vi"    | Choose the agent: `vi` (Value Iteration), `mc` (Monte Carlo), or `ql` (Q-learning). |
 
 ### Monte Carlo and Q-learning shared Parameters
