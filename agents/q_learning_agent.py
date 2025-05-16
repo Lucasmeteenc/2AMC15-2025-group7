@@ -21,7 +21,7 @@ class QLearningAgent(BaseAgent):
 
         self.num_actions = num_actions
 
-        self.grid_height, self.grid_width = grid_shape
+        self.grid_width, self.grid_height = grid_shape
 
         self.Q_table = np.zeros((self.grid_width, self.grid_height, self.num_actions))
         self.Q_table_old = np.zeros((self.grid_width, self.grid_height, self.num_actions))
