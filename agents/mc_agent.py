@@ -49,7 +49,13 @@ class MonteCarloAgent(BaseAgent):
         self.episode_experience = []
         self.max_steps_per_episode = max_steps_per_episode
         
-        self._set_parameters("Monte Carlo", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
+        self._set_parameters("Monte Carlo", 
+                             stochasticity=stochasticity, 
+                             discount_factor=gamma, 
+                             grid_name=grid_name, 
+                             episode_length_mc=max_steps_per_episode, 
+                             reward_function=reward_function, 
+                             initial_alpha=initial_alpha)
 
     def take_action(self, state: tuple[int, int]) -> int:
         """

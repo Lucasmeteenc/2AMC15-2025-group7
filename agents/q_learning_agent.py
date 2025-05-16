@@ -48,7 +48,13 @@ class QLearningAgent(BaseAgent):
 
         self.max_steps_per_episode = max_steps_per_episode
 
-        self._set_parameters("Q learning", stochasticity=stochasticity, discount_factor=gamma, grid_name=grid_name, episode_length_mc=max_steps_per_episode, reward_function=reward_function)
+        self._set_parameters("Q learning", 
+                             stochasticity=stochasticity, 
+                             discount_factor=gamma, 
+                             grid_name=grid_name, 
+                             episode_length_mc=max_steps_per_episode, 
+                             reward_function=reward_function,
+                             initial_alpha=initial_alpha)
 
     def update_epsilon(self):
         """

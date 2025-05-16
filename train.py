@@ -133,7 +133,6 @@ def main_dispatcher():
                                    alpha_decay = args.alpha_decay,
                                    max_steps_per_episode = args.max_steps_per_episode)
 
-
             agent.train(env, iters, args.early_stopping_patience_ql)
 
             # Set the exploration rate to 0 for evaluation
