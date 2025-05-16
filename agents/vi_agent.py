@@ -1,7 +1,3 @@
-"""vi Agent.
-
-This is an agent that takes the action which maximizes the value of the value function.
-"""
 import numpy as np
 
 from world.grid import Grid
@@ -11,8 +7,22 @@ from tqdm import trange
 from world.environment import Environment
 
 class ViAgent(BaseAgent):
-    """Agent that performs Value Iteration to find optimal policy."""
-    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, grid_name="grid_configs/A1_grid.npy", gamma: float = 0.9, sigma: float = 0.1, reward_function="Default"):
+    """
+    Agent that performs Value Iteration to find optimal policy.
+    """
+    def __init__(self, grid: Grid, grid_size: tuple[int, int], reward: callable, grid_name="grid_configs/A1_grid.npy", 
+                 gamma: float = 0.9, sigma: float = 0.1, reward_function="Default"):
+        """
+        Initialize the Value Iteration Agent.
+        Args:
+            grid (Grid): The grid environment.
+            grid_size (tuple): Size of the grid (height, width).
+            reward (callable): Reward function.
+            grid_name (str): Name of the grid file.
+            gamma (float): Discount factor.
+            sigma (float): Stochasticity of the agent's actions.
+            reward_function (str): Reward function to use.
+        """
         super().__init__()
         
         self.grid_size = grid_size
@@ -21,34 +31,23 @@ class ViAgent(BaseAgent):
         self.actions = [0, 1, 2, 3]     # Possible actions (Down, Up, Left, Right)
         self.reward_fn = reward         # Reward function
         self.grid = grid                # Grid environment
-        self.theta = 10**-6              # Convergence threshold
+        self.theta = 10**-6             # Convergence threshold
         self.sigma = sigma              # Stochasticity that agent takes random action
         
-        # Initialize the value function see function description for why not used
-        # self.initialize_values()
         self._set_parameters("Value Iteration", stochasticity=sigma, discount_factor=gamma, grid_name=grid_name, reward_function=reward_function)
-
-    
-    def initialize_values(self):
-        """Initialize the value function based on grid information."""
-        """Using this gave a worse result than not using it mainly due to the -100 for the walls and the random moving into it
-         which is already penalized with the reward"""
-        for i in range(self.grid_size[0]):
-            for j in range(self.grid_size[1]):
-                if self.grid[i, j] in [1, 2]:  # Wall or obstacle
-                    self.V[i, j] = -100
-                elif self.grid[i, j] == 3:     # Target
-                    self.V[i, j] = 10.0
     
     def value_iteration(self):
-        """Perform one sweep of value iteration over the state space."""
+        """
+        Perform one sweep of value iteration over the state space.
+        """
         
         delta = 0
         
         # For each state
         for i in range(1, self.grid_size[0]-1):
             for j in range(1, self.grid_size[1]-1):
-                if self.grid[i, j] in [1, 2]:  # Skip walls and obstacles
+                # Skip walls and obstacles
+                if self.grid[i, j] in [1, 2]:  
                     continue
                     
                 # Store old value
@@ -91,12 +90,13 @@ class ViAgent(BaseAgent):
         
         return delta
     
-    def update(self, state: tuple[int, int], reward: float, action):
-        """Since we learn from the model and not from experiences of the environment"""
-        pass
-    
     def take_action(self, state: tuple[int, int]) -> int:
-        """Choose the action that maximizes expected future reward."""
+        """
+        Choose the action that maximizes expected future reward.
+
+        Args:
+            state (tuple): Current state (row, col).
+        """
         
         best_action = 0
         best_value = float('-inf')
@@ -117,7 +117,9 @@ class ViAgent(BaseAgent):
         return best_action
     
     def get_policy(self):
-        """Extract the complete policy from the value function for all states."""
+        """
+        Extract the complete policy from the value function for all states.
+        """
         policy = np.zeros(self.grid_size, dtype=int)
         for i in range(self.grid_size[0]):
             for j in range(self.grid_size[1]):
@@ -133,15 +135,10 @@ class ViAgent(BaseAgent):
             init_grid (np.ndarray): The grid environment.
         """
         print("\nPolicy (best action for each state):")
+
         found_policy = self.V
         H, W = found_policy.shape
 
-        # action_symbols = {
-        #     0: '↓',  # Down
-        #     1: '↑',  # Up
-        #     2: '←',  # Left
-        #     3: '→'  # Right
-        # }
         wall_symbol = '#'
 
         WALL_VALUE = 1
@@ -182,16 +179,19 @@ class ViAgent(BaseAgent):
             row_str += "|"
             print(row_str)
 
-        # print(found_policy)
         print("-" * (H * 2 + 1))
 
-    # Evaluate the current policy.
     def evaluate_current_policy(self, env: Environment):
+        """
+        Evaluate the current policy by running it in the environment.
+        """
         policy = self.get_policy()
 
         terminated = False
         i = 0
-        while not terminated and i < 1000:  # i serves as failsafe if policy has infinite loop
+        
+        # i serves as failsafe if policy has infinite loop
+        while not terminated and i < 1000:  
             action = policy[env.agent_pos]
             state, reward, terminated, info = env.step(action)
             i+=1
@@ -202,6 +202,12 @@ class ViAgent(BaseAgent):
         return reward
 
     def train(self, env: Environment):
+        """
+        Train the agent using value iteration.
+
+        Args:
+            env (Environment): The environment to train in.
+        """
         delta = float('inf')
         max_iterations = 1000
         
@@ -217,11 +223,8 @@ class ViAgent(BaseAgent):
             if iteration >= max_iterations - 1:
                 print("Warning: Value Iteration did not converge within maximum iterations")
 
-            # if self.step % 20 == 0:
             self.log_metrics(self.evaluate_current_policy(env),conv_metricV=delta)
             self.step += 1
             self.episode += 1
-
-        # self.log_metrics(self.evaluate_current_policy(env))
         
         self.print_policy(np.copy(env.grid))
