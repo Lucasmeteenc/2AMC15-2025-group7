@@ -4,12 +4,6 @@ import numpy as np
 
 # Used claude.ai to quickly iteration on and improve the function
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Used claude.ai to quickly iteration on and improve the function
-
 def create_algorithm_comparison_plots(df, x_param, x_values, algorithms, 
                                      title, x_label, fixed_params=None,
                                      colors=None, figsize=(15, 3),
@@ -245,7 +239,7 @@ fig1 = create_algorithm_comparison_plots(
     use_log_scale=True
 )
 
-df = pd.read_csv("evaluate/results_FIN_MAX_STEPS.csv", sep=",")
+df = pd.read_csv("evaluate/results_FIN_EPSILON.csv", sep=",")
 algorithms = ["Monte Carlo", "Q learning"]
 
 max_steps_per_episode = [100, 250, 500, 1000]
@@ -260,4 +254,19 @@ fig1 = create_algorithm_comparison_plots(
     fixed_params=None,
     save_path="evaluate/episode_length_comparison.svg",
     use_log_scale=True
+)
+
+df = pd.read_csv("evaluate/results_FIN_MAX_STEPS.csv", sep=",")
+algorithms = [ "Monte Carlo", "Q learning"]
+
+max_steps_per_episode = [100, 250, 500, 1000]
+
+fig3 = create_algorithm_comparison_plots(
+    df=df,
+    x_param="episode_length_mc",
+    x_values=max_steps_per_episode,
+    algorithms=algorithms,
+    title="Effect of Episode length on Algorithm Performance",
+    x_label="Episode Length",
+    save_path="evaluate/episode_length_comparison.svg"
 )
