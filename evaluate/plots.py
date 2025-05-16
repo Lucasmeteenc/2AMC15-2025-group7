@@ -239,23 +239,6 @@ fig1 = create_algorithm_comparison_plots(
     use_log_scale=True
 )
 
-df = pd.read_csv("evaluate/results_FIN_EPSILON.csv", sep=",")
-algorithms = ["Monte Carlo", "Q learning"]
-
-max_steps_per_episode = [100, 250, 500, 1000]
-
-fig1 = create_algorithm_comparison_plots(
-    df=df,
-    x_param="episode_length",
-    x_values=max_steps_per_episode,
-    algorithms=algorithms,
-    title="Effect of Epsilon Decay Rate (ε-decay) on Performance",
-    x_label="Maximum Steps per Episode",
-    fixed_params=None,
-    save_path="evaluate/episode_length_comparison.svg",
-    use_log_scale=True
-)
-
 df = pd.read_csv("evaluate/results_FIN_MAX_STEPS.csv", sep=",")
 algorithms = [ "Monte Carlo", "Q learning"]
 
