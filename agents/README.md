@@ -59,6 +59,9 @@ Below is a list of command-line options supported by `train.py`.
 | `--epsilon`                    | `float`  | 1.0     | Initial exploration rate. |
 | `--min_epsilon`                | `float`  | 0.0005  | Minimum exploration rate. |
 | `--epsilon_decay`              | `float`  | 0.999   | Epsilon decay rate per episode. |
+| `--alpha`                    | `float`  | 0.1     | Initial learning rate alpha. |
+| `--min_alpha`                | `float`  | 0.00005  | Minimum learning rate alpha. |
+| `--alpha_decay`              | `float`  | 0.9999   | Alpha decay rate per episode. |
 
 ### Specific parameters
 
