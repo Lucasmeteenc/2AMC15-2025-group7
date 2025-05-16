@@ -8,14 +8,14 @@ The algorithms that were implemented are:
 ### Agents location
 
 2AMC15-2025-group/
-├── agents/ # Contains implementations of different RL agents
-│ ├── init.py 
-│ ├── base_agent.py 
-│ ├── `mc_agent.py` # On-Policy Monte Carlo Control agent
-│ ├── `vi_agent.py` # Value Iteration agent
-│ ├── `q_learning_agent.py` # Q-Learning agent using ε-greedy strategy
-│ ├── random_agent.py 
-│ ├── null_agent.py 
+├── agents/ # Contains implementations of different RL agents..
+│ ├── init.py..
+│ ├── base_agent.py..
+│ ├── `mc_agent.py` # On-Policy Monte Carlo Control agent..
+│ ├── `vi_agent.py` # Value Iteration agent..
+│ ├── `q_learning_agent.py` # Q-Learning agent using ε-greedy strategy..
+│ ├── random_agent.py..
+│ ├── null_agent.py..
 
 
 Example run with default values
