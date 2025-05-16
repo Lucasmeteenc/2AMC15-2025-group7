@@ -20,7 +20,7 @@ class BaseAgent():
         self.algorithm = None
         self.stochasticity = -1.0
         self.discount_factor = -1.0
-        self.episode_length_mc = -1
+        self.episode_length = -1
         self.grid_name = None
         self.reward_function = "Default"
         self.cumulative_reward = -1.0
@@ -52,7 +52,7 @@ class BaseAgent():
             self.discount_factor,
             alpha,
             epsilon,
-            self.episode_length_mc,
+            self.episode_length,
             self.grid_name,
             self.reward_function,
             cumulative_reward,
@@ -76,7 +76,7 @@ class BaseAgent():
                 if not file_exists:
                     header = [
                         'run_id', 'algorithm', 'stochasticity', 'discount_factor', 'learning_rate',
-                        'epsilon', 'episode_length_mc', 'grid_name', 'reward_function', 
+                        'epsilon', 'episode_length', 'grid_name', 'reward_function', 
                         'cumulative_reward', 'step', 'episode', 'conv_metricV', 'conv_metricQ', 
                         'initial_alpha', 'epsilon_decay'
                     ]
@@ -92,7 +92,7 @@ class BaseAgent():
         stochasticity: float,
         discount_factor: float,
         grid_name: str,
-        episode_length_mc: int = -1,
+        episode_length: int = -1,
         reward_function="Default",
         logging_file_path:str = None,
         initial_alpha: float = -1.0,
@@ -107,7 +107,7 @@ class BaseAgent():
             grid_name (str): _description_
             learning_rate (float, optional): _description_. Defaults to -1.0.
             epsilon (float, optional): _description_. Defaults to -1.0.
-            episode_length_mc (int, optional): _description_. Defaults to -1.
+            episode_length (int, optional): _description_. Defaults to -1.
             reward_function (str, optional): _description_. Defaults to "Default".
             logging_file_path (str, optional): _description_. Defaults to None.
             initial_alpha (float, optional): _description_. Defaults to -1.0.
@@ -117,9 +117,9 @@ class BaseAgent():
             NotImplementedError: _description_
             NotImplementedError: _description_
         """
-        if algorithm == "Monte Carlo" and episode_length_mc < 0:
+        if algorithm == "Monte Carlo" and episode_length < 0:
                 raise ValueError(
-                    "Not all parameters of Monte Carlo have been provided.\nGive episode_length_mc"
+                    "Not all parameters of Monte Carlo have been provided.\nGive episode_length"
                 )
 
         # From here on out, we assume parameters have been set correctly
@@ -128,7 +128,7 @@ class BaseAgent():
         self.stochasticity = stochasticity
         self.discount_factor = discount_factor
         self.grid_name = grid_name
-        self.episode_length_mc = episode_length_mc
+        self.episode_length = episode_length
         self.reward_function = reward_function
         self.initial_alpha = initial_alpha
         self.epsilon_decay = epsilon_decay
