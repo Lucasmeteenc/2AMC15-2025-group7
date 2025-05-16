@@ -1,8 +1,3 @@
-"""Q-learning Agent.
-
-This is an agent that ...
-"""
-from random import randint
 import numpy as np
 
 from agents import BaseAgent
@@ -13,21 +8,36 @@ from tqdm import trange
 class QLearningAgent(BaseAgent):
     def __init__(self, grid_shape, grid_name: str, num_actions=4, gamma=0.9, initial_epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.999, 
                  initial_alpha=1.0, min_alpha=0.01, alpha_decay=0.999, stochasticity=-1, max_steps_per_episode=-1, reward_function="Default"):
-        """...
+        """
+        Initialize the Q-learning Agent.
 
-        ...
+        Args:
+            grid_shape (tuple): (height, width) of the grid.
+            grid_name (str): Name of the grid file.
+            num_actions (int): Number of possible actions.
+            gamma (float): Discount factor.
+            initial_epsilon (float): Starting value for epsilon (exploration rate).
+            min_epsilon (float): Minimum value for epsilon.
+            epsilon_decay (float): Factor to decay epsilon by each episode.
+            initial_alpha (float): Starting value for alpha (exploration rate).
+            min_alpha (float): Minimum value for alpha.
+            alpha_decay (float): Factor to decay alpha by each episode.
+            stochasticity (float): Stochasticity of the environment.
+            max_steps_per_episode (int): Maximum steps allowed per episode.
+            reward_function (str): Reward function to use.
         """
         super().__init__()
 
         self.num_actions = num_actions
-
         self.grid_height, self.grid_width = grid_shape
+        self.gamma = gamma
 
+        # Initialize Q-table
         self.Q_table = np.zeros((self.grid_width, self.grid_height, self.num_actions))
+
+        # Initialize old Q-Table and old V to compute convergence speed
         self.Q_table_old = np.zeros((self.grid_width, self.grid_height, self.num_actions))
         self.V_old = np.max(self.Q_table,axis=2)
-
-        self.gamma = gamma
 
         # Epsilon parameters
         self.epsilon = initial_epsilon
@@ -72,12 +82,12 @@ class QLearningAgent(BaseAgent):
             self.alpha *= self.alpha_decay
 
     def update(self, state: tuple[int, int], reward: float, action):
-        """Any code that processes a reward given the state and updates the agent.
+        """
+        Update the Q-table based on the action taken and the received reward.
 
         Args:
             state: The updated position of the agent.
-            reward: The value which is returned by the environment as a
-                reward.
+            reward: The value which is returned by the environment as a reward.
             action: The action which was taken by the agent.
         """
         # TD error
@@ -91,22 +101,33 @@ class QLearningAgent(BaseAgent):
         else:
             self.little_improvement_steps = 0
 
-    def take_action(self, state: tuple[int, int], evaluate: bool = False) -> int:
-        """Any code that does the action should be included here.
+    def take_action(self, state: tuple[int, int]) -> int:
+        """
+        Choose an action using an epsilon-greedy policy.
 
         Args:
-            state: The updated position of the agent.
+            state (tuple): Current state (row, col).
+
+        Returns:
+            int: The chosen action (0-3).
         """
         self.old_state = state
 
         # Epsilon greedy
-        if evaluate or np.random.random() > self.epsilon:
+        if np.random.random() > self.epsilon:
+            # Explore: choose a random action
             return np.argmax(self.Q_table[state[0], state[1]])
         else:
+            # Exploit: choose the best action based on current Q-values
             return np.random.randint(self.num_actions)
         
     def train(self, env: Environment, num_episodes: int, early_stopping_patience: int):
+
+        print(f"\n--- Training Q-learning Agent on Grid: {env.grid_fp.name} ---")
+
+        init_grid_for_policy_print = np.copy(env.grid)
         
+        # Main training loop
         for episode in trange(num_episodes):
             
             state = env.reset()
@@ -114,8 +135,6 @@ class QLearningAgent(BaseAgent):
             self.update_alpha()
 
             self.Q_table_old = np.copy(self.Q_table)
-
-            init_grid_for_policy_print = np.copy(env.grid)
 
             for _ in range(self.max_steps_per_episode):
                 
@@ -131,14 +150,8 @@ class QLearningAgent(BaseAgent):
 
                 self.update(state, reward, info["actual_action"])
 
-                # Every 1000 steps write an iter log
-                if self.step % 1000 == 0:
-                    pass
-                    # self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon)
                 self.step += 1
                 
-            
-            # if self.episode % 100 == 0:
             conv_metricV,conv_metricQ = self.get_convergence_metric()
             self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon,conv_metricV,conv_metricQ)
             self.episode += 1
@@ -147,9 +160,7 @@ class QLearningAgent(BaseAgent):
                 print(f"Early exit after {episode} episodes.")
                 break
 
-        # print(f"{np.argmax(self.Q_table, axis=2)=}")
         self.print_policy(init_grid_for_policy_print)
-
 
     def get_convergence_metric(self):
         """
@@ -157,12 +168,17 @@ class QLearningAgent(BaseAgent):
         difference between current and previous value function.
         """
         
-        V = np.max(self.Q_table, axis=2) #compute current value function
-        max_diff_V = np.max(np.abs(V - self.V_old)) #compute max difference between value functions
-        self.V_old = V #update old value function for next iteration
+        # Compute current value function
+        V = np.max(self.Q_table, axis=2)
+        # Compute max difference between value functions
+        max_diff_V = np.max(np.abs(V - self.V_old))
+        # Update old value function for next iteration
+        self.V_old = V
 
-        abs_diff = np.abs(self.Q_table - self.Q_table_old) # compute abs difference between Q-tables
-        max_diff_Q = np.max(abs_diff) # compute max difference between Q-tables
+        # Compute abs difference between Q-tables
+        abs_diff = np.abs(self.Q_table - self.Q_table_old)
+        # Compute max difference between Q-tables
+        max_diff_Q = np.max(abs_diff)
 
         return max_diff_V, max_diff_Q
     

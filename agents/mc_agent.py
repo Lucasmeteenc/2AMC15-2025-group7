@@ -43,7 +43,7 @@ class MonteCarloAgent(BaseAgent):
         self.alpha_decay = alpha_decay
         self.initial_alpha = initial_alpha
 
-        # Initialize Q-table and Visit Counts
+        # Initialize Q-table
         self.Q = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
 
         # Initialize old Q-Table and old V to compute convergence speed
@@ -137,59 +137,6 @@ class MonteCarloAgent(BaseAgent):
 
                 visited.add((state, action))
 
-    def get_policy(self):
-        """
-        Extract the policy from the Q-table.
-
-        Returns:
-            np.ndarray: The policy (best action for each state).
-        """
-        return np.argmax(self.Q, axis=2)
-    
-    def print_policy(self, init_grid):
-        """
-        Print the policy in a human-readable format.
-
-        Args:
-            init_grid (np.ndarray): The grid environment.
-        """
-        print("\nPolicy (best action for each state):")
-        found_policy = self.get_policy()
-        H, W = found_policy.shape
-
-        action_symbols = {
-            0: '↓',  # Down
-            1: '↑',  # Up
-            2: '←',  # Left
-            3: '→'   # Right
-        }
-        wall_symbol = '#'
-
-        WALL_VALUE = 1
-        OBSTACLE_VALUE = 2
-        TARGET_VALUE = 3
-
-        print("-" * (H * 2 + 1))
-
-        # Print the transposed policy row by row
-        for r_vis in range(W):
-            row_str = "|"
-            for c_vis in range(H):
-                original_row = c_vis
-                original_col = r_vis
-
-                if init_grid[original_row, original_col] == WALL_VALUE or init_grid[original_row, original_col] == OBSTACLE_VALUE:
-                    row_str += wall_symbol + " "
-                elif init_grid[original_row, original_col] == TARGET_VALUE:
-                    row_str += "T" + " "
-                else:
-                    action = found_policy[original_row, original_col]
-                    row_str += action_symbols.get(action, '?') + " "
-            row_str += "|"
-            print(row_str)
-
-        print("-" * (H * 2 + 1))
-
     def train(self, env: Environment, num_episodes: int, early_stopping_patience: int):
         
         print(f"\n--- Training Monte Carlo Agent on Grid: {env.grid_fp.name} ---")
@@ -279,4 +226,57 @@ class MonteCarloAgent(BaseAgent):
         # Compute max difference between Q-tables
         max_diff_Q = np.max(abs_diff) 
 
-        return max_diff_V, max_diff_Q 
+        return max_diff_V, max_diff_Q
+    
+    def get_policy(self):
+        """
+        Extract the policy from the Q-table.
+
+        Returns:
+            np.ndarray: The policy (best action for each state).
+        """
+        return np.argmax(self.Q, axis=2)
+    
+    def print_policy(self, init_grid):
+        """
+        Print the policy in a human-readable format.
+
+        Args:
+            init_grid (np.ndarray): The grid environment.
+        """
+        print("\nPolicy (best action for each state):")
+        found_policy = self.get_policy()
+        H, W = found_policy.shape
+
+        action_symbols = {
+            0: '↓',  # Down
+            1: '↑',  # Up
+            2: '←',  # Left
+            3: '→'   # Right
+        }
+        wall_symbol = '#'
+
+        WALL_VALUE = 1
+        OBSTACLE_VALUE = 2
+        TARGET_VALUE = 3
+
+        print("-" * (H * 2 + 1))
+
+        # Print the transposed policy row by row
+        for r_vis in range(W):
+            row_str = "|"
+            for c_vis in range(H):
+                original_row = c_vis
+                original_col = r_vis
+
+                if init_grid[original_row, original_col] == WALL_VALUE or init_grid[original_row, original_col] == OBSTACLE_VALUE:
+                    row_str += wall_symbol + " "
+                elif init_grid[original_row, original_col] == TARGET_VALUE:
+                    row_str += "T" + " "
+                else:
+                    action = found_policy[original_row, original_col]
+                    row_str += action_symbols.get(action, '?') + " "
+            row_str += "|"
+            print(row_str)
+
+        print("-" * (H * 2 + 1))
