@@ -69,7 +69,7 @@ Below is a list of command-line options supported by `train.py`.
 ### Experiments reproduction
 
 The script that performs the experiments is plots.py, located in the evaluate folder.
-To run it, the only required input is the results.csv file, which contains the results of our experiments.
+To run it, the only required inputs are the results files: results_FIN_ALPHA.csv, results_FIN_EPSILON.csv, results_FIN_GAMMA.csv, resutls_FIN_MAX_STEPS.csv, results_FIN_SIGMA.csv, which contain the results of our experiments.
 
 ### AI Disclaimer
 
