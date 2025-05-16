@@ -4,13 +4,10 @@ Train your RL Agent in this file.
 
 from argparse import ArgumentParser
 from pathlib import Path
-from tqdm import trange
-import random
 import multiprocessing as mp
 
 try:
     from world import Environment
-    from agents.random_agent import RandomAgent
     from agents.vi_agent import ViAgent
     from agents.mc_agent import MonteCarloAgent
     from agents.q_learning_agent import QLearningAgent
@@ -24,7 +21,6 @@ except ModuleNotFoundError:
     if root_path not in sys.path:
         sys.path.extend(root_path)
     from world import Environment
-    from agents.random_agent import RandomAgent
     from agents.vi_agent import ViAgent
     from agents.mc_agent import MonteCarloAgent
     from agents.q_learning_agent import QLearningAgent
@@ -36,35 +32,10 @@ def parse_args():
                         "one.")
     p.add_argument("--no_gui", action="store_true",
                    help="Disables rendering to train faster")
-    # p.add_argument("--sigma", type=float, default=0.1,
-    #                help="Sigma value for the stochasticity of the environment.")
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if "
                         "no_gui is not set.")
-    # p.add_argument("--iters", type=int, default=1000,
-    #                help="Number of iterations to go through.")
-    p.add_argument("--random_seed", type=int, default=0,
-                   help="Random seed value for the environment.")
-    # p.add_argument("--agent", type=str, default="vi",
-    #                help="Agent selection: vi (Value Iteration), mc (On Policy Monte Carlo), ql (Q-Learning).")
-    
-    # Monte Carlo specific parameters
-    # p.add_argument("--max_steps_per_episode", type=int, default=500, # Safety limit
-    #                help="Maximum steps allowed per episode.")
-    # p.add_argument("--gamma", type=float, default=0.9, # Discount factor
-    #                help="Discount factor gamma.")
-    # p.add_argument("--epsilon", type=float, default=1.0, # Initial Epsilon
-    #                help="Initial exploration rate epsilon.")
-    # p.add_argument("--min_epsilon", type=float, default=0.05, # Minimum Epsilon
-    #                help="Minimum exploration rate epsilon.")
-    # p.add_argument("--epsilon_decay", type=float, default=0.9995, # Epsilon decay rate
-    #                help="Epsilon decay rate per episode.")
-    # p.add_argument("--early_stopping_patience_mc", type=int, default=250,
-    #                help="Amount of episodes with the same policy that triggers early stopping.")
-    
-    # Q-Learning specific parameters
-    # p.add_argument("--early_stopping_patience_ql", type=int, default=50,
-    #                help="Amount of episodes with the same policy that triggers early stopping.")
+
     return p.parse_args()
 
 
@@ -127,9 +98,6 @@ def run_train_loop(agent, grid, no_gui, num_episodes, fps, sigma, gamma, epsilon
     
     else:
         raise ValueError(f"Unknown agent type: {agent}")
-    
-    # evaluate (not needed currently)
-    # Environment.evaluate_agent(grid, agent, iters, sigma, random_seed=random_seed)
 
 
 def main_dispatcher():
@@ -137,21 +105,6 @@ def main_dispatcher():
 
     no_gui = args.no_gui
     fps = args.fps
-    random_seed = args.random_seed
-
-    # sigma = args.sigma
-    # agent = args.agent
-    # num_episodes = args.iters
-    # gamma = args.gamma
-    # sigma = args.sigma
-
-    # epsilon = args.epsilon
-    # min_epsilon = args.epsilon
-    # epsilon_decay = args.epsilon_decay
-    # max_steps_per_episode = args.max_steps_per_episode
-
-    # early_stopping_patience_ql = args.early_stopping_patience_ql
-    # early_stopping_patience_mc = args.early_stopping_patience_mc
 
     agents = ["vi", "ql", "mc"]
 
@@ -159,7 +112,7 @@ def main_dispatcher():
     default_values = {
         'vi': {
             'sigma': 0.1,
-            'gamma': 0.95,
+            'gamma': 0.99,
             'epsilon': -1,
             'min_epsilon': -1,
             'epsilon_decay': -1,
@@ -173,40 +126,39 @@ def main_dispatcher():
         },
         'mc': {
             'sigma': 0.1,
-            'gamma': 0.95,
+            'gamma': 0.99,
             'epsilon': 1.0,
-            'min_epsilon': 0.01,
-            'epsilon_decay': 0.9997,
-            'num_episodes': 10000,
-            'max_steps_per_episode': 500,
+            'min_epsilon': 0.0005,
+            'epsilon_decay': 0.9999,
+            'num_episodes': 100_000,
+            'max_steps_per_episode': 5000,
             'early_stopping_patience': 1000,
             'alpha': 0.1,
-            'min_alpha': 0.01,
-            'alpha_decay': 0.995
+            'min_alpha': 0.00005,
+            'alpha_decay': 0.9999
         },
         'ql': {
             'sigma': 0.1,
-            'gamma': 0.95,
+            'gamma': 0.99,
             'epsilon': 1.0,
-            'min_epsilon': -1,
-            'epsilon_decay': -1,
-            'num_episodes': 1000,
-            'max_steps_per_episode': 500,
+            'min_epsilon': 0.0005,
+            'epsilon_decay': 0.9999,
+            'num_episodes': 100_000,
+            'max_steps_per_episode': 5000,
             'early_stopping_patience': 50,
             'alpha': 0.1,
-            'min_alpha': 0.01,
-            'alpha_decay': 0.995
-        }
+            'min_alpha': 0.00005,
+            'alpha_decay': 0.9999
+        },
     }
 
     # Define values to test for different parameters
     values_to_test = {
-        'sigma': [0.01, 0.05, 0.1, 0.3],
+        'sigma': [0.0, 0.05, 0.1, 0.3],
         'gamma': [0.4, 0.8, 0.9, 0.95, 0.99],
-        'epsilon': [1.0, 0.7, 0.3, 0.1],
-        'num_episodes': [500, 1000, 5000, 10000],
+        'initial_alpha': [0.01, 0.05, 0.1, 0.5, 1],
+        'epsilon_decay': [0.95, 0.975, 0.99, 0.999, 0.9999],
         'max_steps_per_episode': [100, 250, 500, 1000],
-        'early_stopping_patience': [50, 100, 250, 500, 1000]
     }
 
     # Number of runs
@@ -242,28 +194,6 @@ def main_dispatcher():
 
 
                 if agent != "vi":
-                    # Starting epsilon. Is still decayed using the same epsilon_decay 
-                    for mod_epsilon in values_to_test['epsilon']:
-                        all_tasks.append((
-                            agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], mod_epsilon, 
-                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                            default_values[agent]['max_steps_per_episode'], default_values['mc']['early_stopping_patience'],
-                            default_values['ql']['early_stopping_patience'], default_values[agent]['alpha'],
-                            default_values[agent]['min_alpha'], default_values[agent]['alpha_decay'], run_id
-                        ))
-                        
-                    # Number of episodes
-                    for mod_num_episodes in values_to_test['num_episodes']:
-                        all_tasks.append((
-                            agent, grid, no_gui, mod_num_episodes, 
-                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
-                            default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                            default_values[agent]['max_steps_per_episode'], default_values['mc']['early_stopping_patience'],
-                            default_values['ql']['early_stopping_patience'], default_values[agent]['alpha'],
-                            default_values[agent]['min_alpha'], default_values[agent]['alpha_decay'], run_id
-                        ))
-
                     # Episode length (both MC and Q-learning, although less efficient for Q-learning.)
                     for mod_max_steps_per_episode in values_to_test['max_steps_per_episode']:
                         all_tasks.append((
@@ -275,23 +205,27 @@ def main_dispatcher():
                             default_values[agent]['min_alpha'], default_values[agent]['alpha_decay'], run_id
                         ))
 
-
-                        
-                    # Early stopping patience
-                    for mod_early_stopping_patience in values_to_test['early_stopping_patience']:
-                        early_stopping_patience_mc = mod_early_stopping_patience if agent == "mc" else default_values['mc']['early_stopping_patience']
-                        early_stopping_patience_ql = mod_early_stopping_patience if agent == "ql" else default_values['ql']['early_stopping_patience']
-
+                    # Initial learning rate
+                    for mod_initial_alpha in values_to_test['initial_alpha']:
                         all_tasks.append((
                             agent, grid, no_gui, default_values[agent]['num_episodes'], 
-                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon'], 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon_decay'], 
                             default_values[agent]['min_epsilon'], default_values[agent]['epsilon_decay'], 
-                            default_values[agent]['max_steps_per_episode'], early_stopping_patience_mc,
-                            early_stopping_patience_ql, default_values[agent]['alpha'],
+                            default_values[agent]['max_steps_per_episode'], default_values['mc']['early_stopping_patience'],
+                            default_values['ql']['early_stopping_patience'], mod_initial_alpha,
                             default_values[agent]['min_alpha'], default_values[agent]['alpha_decay'], run_id
                         ))
 
-                    # TODO learning rate.
+                    # Epsilon decay
+                    for mod_epsilon_decay in values_to_test['epsilon_decay']:
+                        all_tasks.append((
+                            agent, grid, no_gui, default_values[agent]['num_episodes'], 
+                            fps, default_values[agent]['sigma'], default_values[agent]['gamma'], default_values[agent]['epsilon_decay'], 
+                            default_values[agent]['min_epsilon'], mod_epsilon_decay, 
+                            default_values[agent]['max_steps_per_episode'], default_values['mc']['early_stopping_patience'],
+                            default_values['ql']['early_stopping_patience'], default_values[agent]['alpha'],
+                            default_values[agent]['min_alpha'], default_values[agent]['alpha_decay'], run_id
+                        ))
 
     # Use CPU count - 1 to avoid overwhelming the system
     num_processes = max(1, mp.cpu_count() - 1)
