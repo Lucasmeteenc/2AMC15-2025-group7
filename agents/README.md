@@ -5,7 +5,7 @@ The algorithms that were implemented are:
 2. On-policy Monte Carlo 
 3. Q-learning
 
-# Agents location
+### Agents location
 
 2AMC15-2025-group/
 ├── agents/ # Contains implementations of different RL agents
@@ -40,29 +40,36 @@ Below is a list of command-line options supported by `train.py`.
 | `--no_gui`                | flag     | False   | Disables GUI rendering to speed up training. |
 | `--sigma`                 | `float`  | 0.1     | Controls stochasticity of the environment. |
 | `--fps`                   | `int`    | 30      | Frames per second for rendering (ignored if `--no_gui` is set). |
-| `--iters`                 | `int`    | 1000    | Number of iterations (VI) or episodes (MC/QL). |
+| `--iters`                 | `int`    | 100000  | Number of iterations (VI) or episodes (MC/QL). |
 | `--random_seed`           | `int`    | 0       | Random seed for reproducibility. |
+| `--gamma`                 | `float`  | 0.99    | Discount factor for future rewards. |
+
+### Agent selection
+
 | `--agent`                 | `str`    | "vi"    | Choose the agent: `vi` (Value Iteration), `mc` (Monte Carlo), or `ql` (Q-learning). |
 
-### Monte Carlo-Specific
+### Monte Carlo and Q-learning shared Parameters
 
 | Argument                       | Type     | Default | Description |
 |--------------------------------|----------|---------|-------------|
-| `--max_steps_per_episode`      | `int`    | 500     | Max steps allowed per episode (safety cap). |
-| `--gamma`                      | `float`  | 0.99    | Discount factor for future rewards. |
-| `--epsilon`                    | `float`  | 1.0     | Initial exploration rate. |
-| `--min_epsilon`               | `float`  | 0.05    | Minimum exploration rate. |
-| `--epsilon_decay`             | `float`  | 0.9995  | Epsilon decay rate per episode. |
-| `--early_stopping_patience_mc`| `int`    | 250     | Stop if policy remains unchanged for this many episodes. |
+| `--max_steps_per_episode`      | `int`    | 5000    | Max steps allowed per episode (safety cap). |
+| `--epsilon`                   | `float`  | 1.0     | Initial exploration rate. |
+| `--min_epsilon`               | `float`  | 0.0005  | Minimum exploration rate. |
+| `--epsilon_decay`             | `float`  | 0.9999  | Epsilon decay rate per episode. |
 
-### Q-Learning-Specific
+### Specific parameters
 
 | Argument                       | Type     | Default | Description |
 |--------------------------------|----------|---------|-------------|
-| `--num_episodes`               | `int`    | 10,000  | Total episodes to train. |
+| `--early_stopping_patience_mc`| `int`    | 1000    | Stop if policy remains unchanged for this many episodes. |
 | `--early_stopping_patience_ql`| `int`    | 50      | Stop if policy remains unchanged for this many episodes. |
 
-## AI Disclaimer
+### Experiments reproduction
+
+The script that performs the experiments is plots.py, located in the evaluate folder.
+To run it, the only required input is the results.csv file, which contains the results of our experiments.
+
+### AI Disclaimer
 
 AI tools were used only to assist with:
 1. Debugging code-related issues
