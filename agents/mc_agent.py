@@ -12,6 +12,7 @@ class MonteCarloAgent(BaseAgent):
 
         Args:
             grid_shape (tuple): (height, width) of the grid.
+            grid_name (str): Name of the grid file.
             num_actions (int): Number of possible actions.
             gamma (float): Discount factor.
             initial_epsilon (float): Starting value for epsilon (exploration rate).
@@ -20,6 +21,9 @@ class MonteCarloAgent(BaseAgent):
             initial_alpha (float): Starting value for alpha (exploration rate).
             min_alpha (float): Minimum value for alpha.
             alpha_decay (float): Factor to decay alpha by each episode.
+            stochasticity (float): Stochasticity of the environment.
+            max_steps_per_episode (int): Maximum steps allowed per episode.
+            reward_function (str): Reward function to use.
         """
         super().__init__()
         
@@ -42,7 +46,7 @@ class MonteCarloAgent(BaseAgent):
         # Initialize Q-table and Visit Counts
         self.Q = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
 
-        # Initialize old Q-Table and old V to compute convergence speed later
+        # Initialize old Q-Table and old V to compute convergence speed
         self.Q_old = np.zeros((self.grid_height, self.grid_width, self.num_actions), dtype=np.float32)
         self.V_old = np.max(self.Q, axis=2)
 
@@ -125,6 +129,7 @@ class MonteCarloAgent(BaseAgent):
             # Update return
             G = self.gamma * G + reward
 
+            # First visit implementation
             if (state, action) not in visited:
                 # Update Q-value
                 current_q = self.Q[row, col, action]
@@ -209,7 +214,7 @@ class MonteCarloAgent(BaseAgent):
             steps_in_episode = 0
             self.episode_experience = []
 
-            # store current Q-table for convergence metric
+            # Store current Q-table for convergence metric
             self.Q_old = np.copy(self.Q)
 
             # Generate an episode of experience
@@ -246,14 +251,12 @@ class MonteCarloAgent(BaseAgent):
                 same_policy_count = 0
             old_policy = new_policy.copy()
             
-            # if self.episode % 100 == 0:
             conv_metricV, conv_metricQ = self.get_convergence_metric()
             self.log_metrics(env.world_stats["cumulative_reward"], self.alpha, self.epsilon, conv_metricV, conv_metricQ)
             self.episode += 1
 
         if converged:
             print(f"\nMC Policy converged after {episode + 1} episodes.")
-        print(f"Learnign rate: {self.alpha:.4f}, Epsilon: {self.epsilon:.4f}")
         
         print("\n--- MC Training completed ---")
         self.print_policy(init_grid_for_policy_print)
@@ -264,11 +267,16 @@ class MonteCarloAgent(BaseAgent):
         difference between current and previous value function.
         """
         
-        V = np.max(self.Q, axis=2) #compute current value function
-        max_diff_V = np.max(np.abs(V - self.V_old)) #compute max difference between value functions
-        self.V_old = V #update old value function for next iteration
+        # Compute current value function
+        V = np.max(self.Q, axis=2)
+        # Compute max difference between value functions
+        max_diff_V = np.max(np.abs(V - self.V_old))
+        # Update old value function for next iteration
+        self.V_old = V
 
-        abs_diff = np.abs(self.Q - self.Q_old) # compute abs difference between Q-tables
-        max_diff_Q = np.max(abs_diff) # compute max difference between Q-tables
+        # Compute abs difference between Q-tables
+        abs_diff = np.abs(self.Q - self.Q_old)
+        # Compute max difference between Q-tables
+        max_diff_Q = np.max(abs_diff) 
 
         return max_diff_V, max_diff_Q 
