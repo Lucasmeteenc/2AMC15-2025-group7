@@ -101,7 +101,7 @@ class Environment(gym.Env):
         self.max_charge = 100.0  # Maximum battery charge
         self.charger_charge = 20.0
         self.depletion_rate = 2.0  # Battery charge depletion rate per step
-        self.nr_chargers = 5  # Number of chargers in the grid
+        self.nr_chargers = 6  # Number of chargers in the grid
         
         self.charger_locations = self._generate_charger_positions(grid=initial_grid)  # Ensure at least one charger is present
         
@@ -343,6 +343,7 @@ class Environment(gym.Env):
             if self.grid[self.agent_pos] != 4:
                 reward = -5
             else:
+                # print("Charging on a charger tile.")
                 self.charge += self.charger_charge
                 
                 # Check overcharge
@@ -359,9 +360,11 @@ class Environment(gym.Env):
         # Battery depletion
         self.deplete_battery()
         if self.charge <= 0:
-            warn("Battery depleted. Agent cannot move anymore.")
-            terminated = True
-            reward = -100
+            self.charge = -1.0 
+            
+            # Allow move, but switched to "gasoline" mode: Very expensive moves
+            reward -= 10
+
         
 
         # Render if needed
