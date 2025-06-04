@@ -12,13 +12,18 @@ batch_size = 1000
 lr = 0.001
 
 class Agent:
-    def __init__(self):
+    def __init__(self, observation_space, action_space):
         self.n_game = 0
         self.epsilon = 1.0
         self.gamma = 0.9  # <1
         self.memory = deque(maxlen=max_mem)
+        
+        self.observation_space = observation_space
+        self.action_space = action_space
+        self.action_size = action_space.n
+        self.observation_size = observation_space.shape[0]
 
-        self.model = Linear_QNetGen3(2, 128, 4)
+        self.model = Linear_QNetGen3(self.observation_size, 128, self.action_size)
         # self.model.load_state_dict(torch.load('models/Gen3/model218.pth'))
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma)
 
@@ -53,7 +58,6 @@ class Agent:
 
 
 def train():
-    agent = Agent()
     
     env = Environment(
         grid_fp=Path("grid_configs/A1_grid.npy"),
@@ -61,6 +65,8 @@ def train():
         sigma=0.1,
         max_episode_steps=1000
     )
+    
+    agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
 
     # Get begin state
     state_old, info = env.reset()
