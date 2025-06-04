@@ -12,6 +12,8 @@ from warnings import warn
 from time import time, sleep
 from datetime import datetime
 from world.helpers import save_results, action_to_direction
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 try:
     from agents import BaseAgent
@@ -47,14 +49,14 @@ class Environment(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
     
     def __init__(self,
-                 grid_fp: Path,
+                 grid_fp: Path = Path("grid_configs/A1_grid.npy"),
                  render_mode: str = None,
                  sigma: float = 0.,
                  agent_start_pos: tuple[int, int] = None,
                  reward_fn: callable = None,
                  target_fps: int = 30,
                  random_seed: int | float | str | bytes | bytearray | None = 0,
-                 max_episode_steps: int = 5000):
+                 max_episode_steps: int = 1000):
         
         """Creates the Grid Environment for the Reinforcement Learning robot
         from the provided file.
@@ -373,6 +375,10 @@ class Environment(gym.Env):
             if time_to_wait > 0:
                 sleep(time_to_wait)
             self.gui.render(self.grid, self.agent_pos, self.info, reward, is_single_step, self.world_stats)
+            
+        if terminated or truncated:
+            print(f"Episode ended after {self.current_step} steps. "
+                    f"Total reward: {self.world_stats['cumulative_reward']}")
 
         # return np.array(self.agent_pos, dtype=np.int32), reward, terminated, truncated, self.info
         return self._get_state(), reward, terminated, truncated, self.info
@@ -395,6 +401,43 @@ class Environment(gym.Env):
             if self.gui is None:
                 self.gui = GUI(self.grid.shape)
             self.gui.render(self.grid, self.agent_pos, self.info, 0, False, self.world_stats)
+            
+            # Hack to allow baseline
+        elif self.render_mode == "rgb_array":
+            # 1) Create a fresh figure & axis
+            fig, ax = plt.subplots(
+                figsize=(self.grid.shape[1] / 10, self.grid.shape[0] / 10),
+                dpi=100
+            )
+            ax.imshow(self.grid, cmap="gray_r", interpolation="nearest")
+            ax.scatter(
+                self.agent_pos[1],
+                self.agent_pos[0],
+                c="red",
+                s=50,
+                marker="o"
+            )
+            # … any other plotting code you want (targets, chargers, etc.) …
+            ax.axis("off")
+
+            # 2) Attach an Agg canvas to that figure and draw
+            canvas = FigureCanvas(fig)
+            canvas.draw()
+
+            # 3) Extract the RGBA buffer from the Agg canvas
+            width, height = canvas.get_width_height()
+            buffer = np.frombuffer(canvas.buffer_rgba(), dtype=np.uint8)
+            # buffer.shape == (height * width * 4,)
+            img_rgba = buffer.reshape((height, width, 4))
+
+            # 4) Drop the alpha channel → keep only RGB
+            img_rgb = img_rgba[:, :, :3]
+
+            plt.close(fig)
+            return img_rgb
+
+        else:
+            raise NotImplementedError(f"Render mode '{self.render_mode}' not supported.")
         
     def close(self):
         """Close the environment."""
