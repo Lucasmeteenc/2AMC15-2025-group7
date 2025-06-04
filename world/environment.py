@@ -100,8 +100,10 @@ class Environment(gym.Env):
         self.charge = 100.0  # Initial battery charge
         self.max_charge = 100.0  # Maximum battery charge
         self.charger_charge = 20.0
-        self.depletion_rate = 5.0  # Battery charge depletion rate per step
+        self.depletion_rate = 2.0  # Battery charge depletion rate per step
         self.nr_chargers = 5  # Number of chargers in the grid
+        
+        self.charger_locations = self._generate_charger_positions(grid=initial_grid)  # Ensure at least one charger is present
         
         # Observation space dim
         low = np.array([0, 0] +   # Agent position
@@ -143,29 +145,31 @@ class Environment(gym.Env):
         # Initialize state variables
         self.grid = None
         self.agent_pos = None
+        self.target_pos = None
         self.info = {}
         self.world_stats = {}
         self.max_episode_steps = max_episode_steps
         self.current_step = 0
         
-    def _add_charger_if_not_enough(self, seed=None):
-        """Adds a charger tile to the grid if it does not exist."""
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-            
-        if np.sum(self.grid == 4) >= self.nr_chargers:
-            return
         
-        if self.nr_chargers > np.sum(self.grid == 0):
-            raise ValueError(
-                f"Not enough empty tiles to place {self.nr_chargers} chargers. ")
+    def _generate_charger_positions(self, grid: np.ndarray) -> list[tuple[int, int]]:
+        """Generates random charger positions on the grid."""
+        charger_positions = []
+        zeros = np.where(grid == 0)
         
-        warn("Not enough chargers in the grid. Adding more chargers.")
-        while np.sum(self.grid == 4) < self.nr_chargers:
-            zeros = np.where(self.grid == 0)
+        while len(charger_positions) < self.nr_chargers:
             idx = random.randint(0, len(zeros[0]) - 1)
-            self.grid[zeros[0][idx], zeros[1][idx]] = 4
+            pos = (zeros[0][idx], zeros[1][idx])
+            if pos not in charger_positions:
+                charger_positions.append(pos)
+                grid[pos] = 4
+                
+        return charger_positions
+        
+    def _set_chargers_on_grid(self):
+        """Set the chargers on the defined grid locations."""
+        for pos in self.charger_locations:
+            self.grid[pos] = 4
 
 
     def _reset_info(self) -> dict:
@@ -206,12 +210,9 @@ class Environment(gym.Env):
     def _get_state(self) -> np.ndarray:
         """Returns the current state of the environment."""
         agent_pos = np.array(self.agent_pos, dtype=np.float32)
-        target_pos = np.array(np.where(self.grid == 3), dtype=np.float32).flatten()
+        target_pos = np.array(self.target_pos, dtype=np.float32).flatten()
         charger_positions = np.array(np.where(self.grid == 4)).T.flatten()
         battery_charge = np.array(self.charge, dtype=np.float32)
-        
-        print(np.where(self.grid == 4))
-        print(charger_positions)
         
         # Combine all into a single state array
         state = np.concatenate((agent_pos, target_pos, charger_positions, battery_charge.reshape(1)))
@@ -251,7 +252,9 @@ class Environment(gym.Env):
         self._initialize_agent_pos()
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
-        self._add_charger_if_not_enough(seed=seed)
+        self._set_chargers_on_grid()
+        self.charge = self.max_charge  # Reset charge to max
+        self.target_pos = np.where(self.grid == 3)
 
         # GUI specific code
         if self.render_mode == "human":
@@ -270,7 +273,7 @@ class Environment(gym.Env):
     def _move_agent(self, new_pos: tuple[int, int]):
         """Moves the agent, if possible and updates the corresponding stats."""
         match self.grid[new_pos]:
-            case 0:  # Moved to an empty tile
+            case 0 | 4:  # Moved to an empty tile
                 self.agent_pos = new_pos
                 self.info["agent_moved"] = True
                 self.world_stats["total_agent_moves"] += 1
@@ -322,21 +325,44 @@ class Environment(gym.Env):
         if val > self.sigma:
             actual_action = action
         else:
-            actual_action = random.randint(0, 3)
+            actual_action = random.randint(0, 4)
         
         # Make the move
         self.info["actual_action"] = actual_action
         direction = action_to_direction(actual_action)    
         new_pos = (self.agent_pos[0] + direction[0], self.agent_pos[1] + direction[1])
 
-        # Calculate the reward for the agent
+        # Calculate the reward for the agent moving
         reward = self.reward_fn(self.grid, new_pos)
         self._move_agent(new_pos)
         self.world_stats["cumulative_reward"] += reward
+        
+        # Check charger penalty
+        if actual_action == 4:
+            # Charging on a non-charger tile
+            if self.grid[self.agent_pos] != 4:
+                reward = -5
+            else:
+                self.charge += self.charger_charge
+                
+                # Check overcharge
+                if self.charge > self.max_charge:
+                    self.charge = self.max_charge
+                    reward = -3
+                else:
+                    reward = -0.1
 
         # Check if terminal state is reached
         terminated = np.sum(self.grid == 3) == 0
         truncated = self.current_step >= self.max_episode_steps
+        
+        # Battery depletion
+        self.deplete_battery()
+        if self.charge <= 0:
+            warn("Battery depleted. Agent cannot move anymore.")
+            terminated = True
+            reward = -100
+        
 
         # Render if needed
         if self.render_mode == "human" and self.gui is not None:
@@ -347,7 +373,19 @@ class Environment(gym.Env):
 
         # return np.array(self.agent_pos, dtype=np.int32), reward, terminated, truncated, self.info
         return self._get_state(), reward, terminated, truncated, self.info
-
+    
+    def deplete_battery(self):
+        """Deplete the battery following randomly chosen depletion rate."""
+        mean = self.depletion_rate
+        sigma = self.depletion_rate / 3.0    # ⇒ ~99.7% of a N(μ,σ²) lies in [μ−3σ, μ+3σ] == [0, 2·depletion_rate]
+        
+        depletion = random.gauss(mean, sigma)
+        
+        # Bound depletion to be within [0, 2·depletion_rate]
+        depletion = min(max(0.0, depletion), self.depletion_rate * 2)  
+        
+        self.charge -= depletion
+        
     def render(self):
         """Render the environment."""
         if self.render_mode == "human":
@@ -371,6 +409,8 @@ class Environment(gym.Env):
                 reward = -5
             case 3:  # Moved to a target tile
                 reward = 10
+            case 4:  # Moved to a charger tile    
+                reward = -1
             case _:
                 raise ValueError(f"Grid cell should not have value: {grid[agent_pos]} "
                                 f"at position {agent_pos}")

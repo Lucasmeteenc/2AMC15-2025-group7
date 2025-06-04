@@ -72,7 +72,6 @@ def train():
     state_old, info = env.reset()
     # env.render()
 
-    score = 0
     old_reward = 0
     for i in range(10_000):
         if i % 100 == 0:
@@ -84,7 +83,6 @@ def train():
 
         # perform move
         state_new, reward, terminated, truncated, info = env.step(final_move)
-        score += 1
 
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, terminated)
@@ -100,10 +98,10 @@ def train():
             agent.n_game += 1
             agent.train_long_memory()
 
-            print(score)
-            if score > old_reward:
-                agent.model.save(file_name='model{}.pth'.format(score))
-                old_reward = score
+            # print(score)
+            # if score > old_reward:
+            #     agent.model.save(file_name='model{}.pth'.format(score))
+            #     old_reward = score
 
             score = 0
     env.close()

@@ -7,6 +7,7 @@ def action_to_direction(action):
         1: (0, -1),  # Up
         2: (-1, 0),  # Left
         3: (1, 0),   # Right
+        4: (0, 0)    # No movement -> Only charge
     }
     return directions[action]
 
