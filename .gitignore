@@ -241,3 +241,4 @@ venv.bak/
 .mypy_cache/
 
 results.csv
+models/Gen3/

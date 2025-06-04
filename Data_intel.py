@@ -1,11 +1,10 @@
 import torch
 import random
 import numpy as np
-from learning_game import SnakeGameAI, Direction, Point
 from collections import deque
-from model import Linear_QNet, Linear_QNetGen3, QTrainer
-import gymnasium as gym
-
+from model import Linear_QNetGen3, QTrainer
+from world.environment import Environment
+from pathlib import Path
 
 np.set_printoptions(linewidth=np.inf)
 max_mem = 10_000
@@ -19,7 +18,7 @@ class Agent:
         self.gamma = 0.9  # <1
         self.memory = deque(maxlen=max_mem)
 
-        self.model = Linear_QNetGen3(4, 128, 2)
+        self.model = Linear_QNetGen3(2, 128, 4)
         # self.model.load_state_dict(torch.load('models/Gen3/model218.pth'))
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma)
 
@@ -55,7 +54,13 @@ class Agent:
 
 def train():
     agent = Agent()
-    env = gym.make("CartPole-v1", render_mode="human")
+    
+    env = Environment(
+        grid_fp=Path("grid_configs/A1_grid.npy"),
+        render_mode="human",
+        sigma=0.1,
+        max_episode_steps=1000
+    )
 
     # Get begin state
     state_old, info = env.reset()
