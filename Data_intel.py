@@ -23,7 +23,7 @@ class Agent:
         self.action_size = action_space.n
         self.observation_size = observation_space.shape[0]
 
-        self.model = Linear_QNetGen3(self.observation_size, 1028, self.action_size)
+        self.model = Linear_QNetGen3(self.observation_size, 128, self.action_size)
         # self.model.load_state_dict(torch.load('models/Gen3/model218.pth'))
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma)
 
@@ -59,20 +59,20 @@ class Agent:
 
 def train():
     
-    # env = Environment(
-    #     grid_fp=Path("grid_configs/A1_grid.npy"),
-    #     render_mode='human',
-    #     sigma=0.1,
-    #     max_episode_steps=1000
-    # )
-    
-    # No gui mode
     env = Environment(
         grid_fp=Path("grid_configs/A1_grid.npy"),
-        render_mode='rgb_array',
+        render_mode='human',
         sigma=0.1,
         max_episode_steps=1000
-    ) 
+    )
+    
+    # # No gui mode
+    # env = Environment(
+    #     grid_fp=Path("grid_configs/A1_grid.npy"),
+    #     render_mode='rgb_array',
+    #     sigma=0.1,
+    #     max_episode_steps=1000
+    # ) 
     
     agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
 

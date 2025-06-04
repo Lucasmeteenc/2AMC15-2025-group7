@@ -101,7 +101,7 @@ class Environment(gym.Env):
         self.max_charge = 100.0  # Maximum battery charge
         self.charger_charge = 20.0
         self.depletion_rate = 2.0  # Battery charge depletion rate per step
-        self.nr_chargers = 6  # Number of chargers in the grid
+        self.nr_chargers = 40  # Number of chargers in the grid
         
         self.charger_locations = self._generate_charger_positions(grid=initial_grid)  # Ensure at least one charger is present
         
