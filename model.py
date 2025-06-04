@@ -72,7 +72,6 @@ class QTrainer:
             done = (done, )
 
         # predicted Q values
-        print(state)
         pred = self.model(state)
 
         # ar + y * max(next_predicted Q value)

@@ -92,7 +92,7 @@ class Environment(gym.Env):
         self.grid_shape = initial_grid.shape
         
         # Determine the number of chargers in the grid - At least one charger is required
-        self.num_chargers = max(1, np.sum(initial_grid == 4))  
+        self.nr_chargers = max(1, np.sum(initial_grid == 4))  
         
         # action space: 5 discrete actions (down, up, left, right, charge)
         self.action_space = spaces.Discrete(5)
@@ -101,26 +101,18 @@ class Environment(gym.Env):
         self.max_charge = 100.0  # Maximum battery charge
         self.charger_charge = 20.0
         self.depletion_rate = 5.0  # Battery charge depletion rate per step
-        
-        # # observation space: agent position as tuple of coordinates
-        # self.observation_space = spaces.Box(
-        #     low=np.array([0, 0]), 
-        #     high=np.array([self.grid_shape[0] - 1, self.grid_shape[1] - 1]), 
-        #     dtype=np.int32
-        # )
+        self.nr_chargers = 5  # Number of chargers in the grid
         
         # Observation space dim
-        
-
         low = np.array([0, 0] +   # Agent position
                         [0, 0] +  # Target position
-                        [0, 0] * self.num_chargers + # charger positions
+                        [0, 0] * self.nr_chargers + # charger positions
                         [0.0], dtype=np.float32) # Battery charge
         
         grid_high = max(self.grid_shape)
         high = np.array([grid_high, grid_high] +
                         [grid_high, grid_high] + 
-                        [grid_high, grid_high] * self.num_chargers + 
+                        [grid_high, grid_high] * self.nr_chargers + 
                         [self.max_charge], dtype=np.float32)
         
         # New observation space: agent position, target position, charger position, battery charge
@@ -156,14 +148,21 @@ class Environment(gym.Env):
         self.max_episode_steps = max_episode_steps
         self.current_step = 0
         
-    def _add_charger_if_not_present(self, seed=None):
+    def _add_charger_if_not_enough(self, seed=None):
         """Adds a charger tile to the grid if it does not exist."""
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
+            
+        if np.sum(self.grid == 4) >= self.nr_chargers:
+            return
         
-        if np.sum(self.grid == 4) == 0:
-            warn("No charger tile found in the grid. Adding one at random position.")
+        if self.nr_chargers > np.sum(self.grid == 0):
+            raise ValueError(
+                f"Not enough empty tiles to place {self.nr_chargers} chargers. ")
+        
+        warn("Not enough chargers in the grid. Adding more chargers.")
+        while np.sum(self.grid == 4) < self.nr_chargers:
             zeros = np.where(self.grid == 0)
             idx = random.randint(0, len(zeros[0]) - 1)
             self.grid[zeros[0][idx], zeros[1][idx]] = 4
@@ -208,9 +207,10 @@ class Environment(gym.Env):
         """Returns the current state of the environment."""
         agent_pos = np.array(self.agent_pos, dtype=np.float32)
         target_pos = np.array(np.where(self.grid == 3), dtype=np.float32).flatten()
-        charger_positions = np.array(np.where(self.grid == 4), dtype=np.float32).T.flatten()
+        charger_positions = np.array(np.where(self.grid == 4)).T.flatten()
         battery_charge = np.array(self.charge, dtype=np.float32)
         
+        print(np.where(self.grid == 4))
         print(charger_positions)
         
         # Combine all into a single state array
@@ -251,7 +251,7 @@ class Environment(gym.Env):
         self._initialize_agent_pos()
         self.info = self._reset_info()
         self.world_stats = self._reset_world_stats()
-        self._add_charger_if_not_present(seed=seed)
+        self._add_charger_if_not_enough(seed=seed)
 
         # GUI specific code
         if self.render_mode == "human":
