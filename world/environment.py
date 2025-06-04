@@ -352,7 +352,7 @@ class Environment(gym.Env):
                     self.charge = self.max_charge
                     reward = -3
                 else:
-                    reward = -0.1
+                    reward = -1.0
                     
 
         # Check if terminal state is reached
