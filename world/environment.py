@@ -335,7 +335,6 @@ class Environment(gym.Env):
         # Calculate the reward for the agent moving
         reward = self.reward_fn(self.grid, new_pos)
         self._move_agent(new_pos)
-        self.world_stats["cumulative_reward"] += reward
         
         # Check charger penalty
         if actual_action == 4:
@@ -352,6 +351,7 @@ class Environment(gym.Env):
                     reward = -3
                 else:
                     reward = -0.1
+                    
 
         # Check if terminal state is reached
         terminated = np.sum(self.grid == 3) == 0
@@ -365,7 +365,7 @@ class Environment(gym.Env):
             # Allow move, but switched to "gasoline" mode: Very expensive moves
             reward -= 10
 
-        
+        self.world_stats["cumulative_reward"] += reward
 
         # Render if needed
         if self.render_mode == "human" and self.gui is not None:

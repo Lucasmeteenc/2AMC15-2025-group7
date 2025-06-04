@@ -23,7 +23,7 @@ class Agent:
         self.action_size = action_space.n
         self.observation_size = observation_space.shape[0]
 
-        self.model = Linear_QNetGen3(self.observation_size, 128, self.action_size)
+        self.model = Linear_QNetGen3(self.observation_size, 1028, self.action_size)
         # self.model.load_state_dict(torch.load('models/Gen3/model218.pth'))
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma)
 
@@ -59,12 +59,20 @@ class Agent:
 
 def train():
     
+    # env = Environment(
+    #     grid_fp=Path("grid_configs/A1_grid.npy"),
+    #     render_mode='human',
+    #     sigma=0.1,
+    #     max_episode_steps=1000
+    # )
+    
+    # No gui mode
     env = Environment(
         grid_fp=Path("grid_configs/A1_grid.npy"),
-        render_mode="human",
+        render_mode='rgb_array',
         sigma=0.1,
         max_episode_steps=1000
-    )
+    ) 
     
     agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
 
@@ -73,10 +81,10 @@ def train():
     # env.render()
 
     old_reward = 0
-    for i in range(10_000):
+    for i in range(1_000_000):
         if i % 100 == 0:
             # print(i)
-            agent.epsilon = max(0.1, agent.epsilon * 0.95)
+            agent.epsilon = max(0.1, agent.epsilon * 0.995)
 
         # get move
         final_move = agent.get_action(state_old)
@@ -92,18 +100,18 @@ def train():
 
         state_old = state_new
 
-        if terminated:
+        if terminated or truncated:  # Game terminated or truncated (e.g., max steps reached)
             # train long memory
+            score = env.world_stats["cumulative_reward"]
             state_old, info = env.reset()
             agent.n_game += 1
             agent.train_long_memory()
 
-            # print(score)
-            # if score > old_reward:
-            #     agent.model.save(file_name='model{}.pth'.format(score))
-            #     old_reward = score
-
-            score = 0
+            print(f'Game {agent.n_game}, Score: {score}, Epsilon: {agent.epsilon:.2f}')
+            if score > old_reward:
+                agent.model.save(file_name='model{}.pth'.format(score))
+                old_reward = score
     env.close()
+    
 if __name__ == '__main__':
     train()
