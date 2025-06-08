@@ -19,7 +19,7 @@ def make_env(gym_id, idx, run_name):
         env = gym.make(gym_id, render_mode='rgb_array')
         env = RecordEpisodeStatistics(env)
         if idx == 0:
-            env = RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda x: x % 1000 == 0)
+            env = RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda x: x % 100 == 0)
         return env
     return thunk
 
@@ -252,9 +252,7 @@ class PPOTrainer:
 
 if __name__ == "__main__":
     args = parse_args()
-    print(args)
     run_name = f'{args.exp_name}_{args.gym_id}_seed{args.seed}__{int(time.time())}'
-    print(f"Run Name: {run_name}")
 
     # Set random seed for reproducibility
     random.seed(args.seed)
