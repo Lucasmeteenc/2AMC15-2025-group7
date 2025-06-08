@@ -176,9 +176,9 @@ class Environment(gym.Env):
 
     def _reset_info(self) -> dict:
         """Resets the info dictionary."""
-        return {"target_reached": False,
-                "agent_moved": False,
-                "actual_action": None}
+        return {"target_reached": 0,
+                "agent_moved": 0,
+                "actual_action": -1}
     
     @staticmethod
     def _reset_world_stats() -> dict:
@@ -277,17 +277,17 @@ class Environment(gym.Env):
         match self.grid[new_pos]:
             case 0 | 4:  # Moved to an empty tile
                 self.agent_pos = new_pos
-                self.info["agent_moved"] = True
+                self.info["agent_moved"] = 1
                 self.world_stats["total_agent_moves"] += 1
             case 1 | 2:  # Moved to a wall or obstacle
                 self.world_stats["total_failed_moves"] += 1
-                self.info["agent_moved"] = False
+                self.info["agent_moved"] = 0
             case 3:  # Moved to a target tile
                 self.agent_pos = new_pos
                 self.grid[new_pos] = 0
-                self.info["target_reached"] = True
+                self.info["target_reached"] = 1
                 self.world_stats["total_targets_reached"] += 1
-                self.info["agent_moved"] = True
+                self.info["agent_moved"] = 0
                 self.world_stats["total_agent_moves"] += 1
             case _:
                 raise ValueError(f"Grid is badly formed. It has a value of "
