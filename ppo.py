@@ -14,9 +14,12 @@ import gymnasium as gym
 from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 from gym.wrappers.record_video import RecordVideo
 
-def make_env(gym_id, idx, run_name):
+from world.environment import Environment
+from pathlib import Path
+
+def make_custom_env(idx, run_name, grid_fp, max_episode_steps=1000, render_mode='rgb_array'):
     def thunk():
-        env = gym.make(gym_id, render_mode='rgb_array')
+        env = Environment(grid_fp=grid_fp, max_episode_steps=max_episode_steps, render_mode=render_mode)
         env = RecordEpisodeStatistics(env)
         if idx == 0:
             env = RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda x: x % 100 == 0)
@@ -32,8 +35,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='PPO Training Configuration')
 
     # General Settings
-    parser.add_argument('--exp-name', type=str, default='ppo_experiment', help='Name of the experiment')
-    parser.add_argument('--gym-id', type=str, default='CartPole-v1', help='Gym environment ID')
+    parser.add_argument('--exp-name', type=str, default='ppo_custom_env', help='Name of the experiment')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     parser.add_argument('--use-gpu', action=argparse.BooleanOptionalAction, default=True, help='Use GPU (cuda or mps) for training if available (e.g., --use-gpu or --no-use-gpu)')
     parser.add_argument('--use-wandb', action=argparse.BooleanOptionalAction, default=True, help='Use Weights & Biases for logging (e.g., --use-wandb or --no-use-wandb)')
@@ -42,6 +44,8 @@ def parse_args():
 
     # Environment Settings
     parser.add_argument('--num-envs', type=int, default=4, help='Number of parallel environments to use')
+    parser.add_argument('--grid-fp', type=str, default='grid_configs/A1_grid.npy', help='Grid file path for the environment')
+    parser.add_argument('--max-episode-steps', type=int, default=1000, help='Maximum number of steps per episode') # might be duplicate with the num-steps in the training parameters
 
     # Training Parameters
     parser.add_argument('--total-timesteps', type=int, default=25000, help='Total number of timesteps for training')
@@ -147,15 +151,16 @@ class PPOTrainer:
                 )
 
                 # Log episode data if available
-                if "final_info" in info:
-                    for final_info_item in info["final_info"]:
-                        if final_info_item and "episode" in final_info_item:
-                            # Skip items that are None (environments that didn't just end)
-                            episode_return = final_info_item["episode"]["r"]
-                            episode_length = final_info_item["episode"]["l"]
-                            print(f"global_step={global_step}, episode_return={episode_return}, episode_length={episode_length}")
-                            self.writer.add_scalar("charts/episode_return", episode_return, global_step)
-                            self.writer.add_scalar("charts/episode_length", episode_length, global_step)
+                if '_episode' in info:
+                    finished_mask = info['_episode']
+
+                    episode_returns = info['episode']['r'][finished_mask]
+                    episode_lengths = info['episode']['l'][finished_mask]
+
+                    for i in range(len(episode_returns)):
+                        print(f"global_step={global_step}, episode_return={episode_returns[i]}, episode_length={episode_lengths[i]}")
+                        self.writer.add_scalar("charts/episode_return", episode_returns[i], global_step)
+                        self.writer.add_scalar("charts/episode_length", episode_lengths[i], global_step)
 
             # Compute advantages and returns
             with torch.no_grad():
@@ -252,7 +257,10 @@ class PPOTrainer:
 
 if __name__ == "__main__":
     args = parse_args()
-    run_name = f'{args.exp_name}_{args.gym_id}_seed{args.seed}__{int(time.time())}'
+    run_name = f'{args.exp_name}_custom-env_seed{args.seed}__{int(time.time())}'
+
+    # Convert grid file path to Path object
+    args.grid_fp = Path(args.grid_fp)
 
     # Set random seed for reproducibility
     random.seed(args.seed)
@@ -291,7 +299,7 @@ if __name__ == "__main__":
 
     # Training logic    
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.gym_id, i, run_name) for i in range(args.num_envs)]
+        [make_custom_env(i, run_name, args.grid_fp, args.max_episode_steps) for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), \
         "This script is designed for discrete action spaces only."
