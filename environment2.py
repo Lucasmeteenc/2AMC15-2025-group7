@@ -46,25 +46,25 @@ class SimpleDeliveryEnv(gym.Env):
     def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=None):
         super().__init__()
 
-        # 1. Load map data
-        self.map_config = self._load_map(map_config)
-        self.W,self.H = self.map_size
-
-        # 2. Compute map diagonal for normalization
-        self.dmax = np.hypot(self.W, self.H)
-
-        # 3. Episode params
-        self.nr_packages = NR_PACKAGES
-        self.max_steps = MAX_STEPS
-
-        # 4. Init state params
+        # 1. Init state params
         self.agent_x:            float | None = None
         self.agent_y:            float | None = None
         self.agent_theta:        float | None = None
         self.has_package:         bool | None = None
         self.packages_left:        int | None = None
-        self.current_goal_x:     float | None = None
-        self.current_goal_y:     float | None = None
+        self.delivery_goal_x:     float | None = None
+        self.delivery_goal_y:     float | None = None
+
+        # 2. Load map data
+        self.map_config = self._load_map(map_config)
+        self.W,self.H = self.map_size
+
+        # 3. Compute map diagonal for normalization
+        self.dmax = np.hypot(self.W, self.H)
+
+        # 4. Episode params
+        self.nr_packages = NR_PACKAGES
+        self.max_steps = MAX_STEPS
 
         # 5. Create action space
         self.action_names = ACTIONS
@@ -74,8 +74,8 @@ class SimpleDeliveryEnv(gym.Env):
         #   1. agent_x / self.map_size[0]   6. packages_left / self.nr_packages
         #   2. agent_y / self.map_size[1]   7. depot_x / self.map_size[0]
         #   3. sin(agent_theta)             8. depot_y / self.map_size[1]
-        #   4. cos(agent_theta)             9. current_goal_x / self.map_size[0]
-        #   5. has_package                  10. current_goal_y / self.map_size[1]
+        #   4. cos(agent_theta)             9. delivery_goal_x / self.map_size[0]
+        #   5. has_package                  10. delivery_goal_y / self.map_size[1]
         #                                   
 
         low  = np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0],  dtype=np.float32)
@@ -93,6 +93,9 @@ class SimpleDeliveryEnv(gym.Env):
         self.render_mode = render_mode
         self.fig = None
         self.ax = None
+        
+        # 10. Set one fixed goal
+        # self._sample_goal()
 
     def _load_map(self, map_config: dict):
         """Check whether the provided map_config is a valid map."""
@@ -102,7 +105,7 @@ class SimpleDeliveryEnv(gym.Env):
             raise ValueError("map_config must be a dictionary")
         
         # check whether it contains the required keys
-        for key in ["size","depot","obstacles"]:
+        for key in ["size","depot","obstacles", "delivery"]:
             if key not in map_config:
                 raise ValueError(f"map_config must contain the key '{key}'")
 
@@ -125,6 +128,15 @@ class SimpleDeliveryEnv(gym.Env):
             any((not isinstance(o, (tuple, list)) or len(o) != 4) for o in obstacles)):
             raise ValueError("map_config['obstacles'] must be a list of 4-tuples [(xmin,ymin,xmax,ymax), …]")
         self.obstacles = np.array(obstacles, dtype=np.float32)
+        
+        # Validate & store "delivery" (must be 2 floats/ints)
+        delivery = map_config.get("delivery", None)
+        if delivery is None:
+            self._sample_goal()
+        else:
+            if (not isinstance(delivery, (tuple, list)) or len(delivery) != 2):
+                raise ValueError("map_config['delivery'] must be a 2-tuple (x, y)")
+            self.delivery_goal_x, self.delivery_goal_y = delivery
 
         return map_config
     
@@ -154,8 +166,7 @@ class SimpleDeliveryEnv(gym.Env):
         # reset environmental params
         self.has_package = False
         self.packages_left = self.nr_packages
-        self.current_goal_x = 0.0
-        self.current_goal_y = 0.0
+        
         self.steps = 0
 
         # initialize flags
@@ -208,7 +219,7 @@ class SimpleDeliveryEnv(gym.Env):
 
         # relative vectors to current goal if package is held
         if self.has_package:
-            vec_goal = (np.array([self.current_goal_x, self.current_goal_y]) -
+            vec_goal = (np.array([self.delivery_goal_x, self.delivery_goal_y]) -
                         np.array([self.agent_x, self.agent_y])) / self.dmax
         else:
             vec_goal = np.zeros(2, dtype=np.float32)
@@ -274,14 +285,13 @@ class SimpleDeliveryEnv(gym.Env):
 
         if self._legal_pickup():
             self.has_package = True
-            self._sample_goal()
             return True
         return False
 
     def _legal_deliver(self):
         return (
             self.has_package 
-            and self._near([self.current_goal_x, self.current_goal_y])
+            and self._near([self.delivery_goal_x, self.delivery_goal_y])
         )
 
     def _try_deliver(self):
@@ -290,7 +300,6 @@ class SimpleDeliveryEnv(gym.Env):
         if self._legal_deliver():
             self.has_package = False
             self.packages_left -= 1
-            self.current_goal_x = self.current_goal_y = 0.0
             return True
         return False
     
@@ -305,7 +314,7 @@ class SimpleDeliveryEnv(gym.Env):
                 if self._in_obstacle(gx, gy):
                     continue
                 # set goal
-                self.current_goal_x, self.current_goal_y = gx, gy
+                self.delivery_goal_x, self.delivery_goal_y = gx, gy
                 break
     
     # --- Random Free Position Sampling -----------------------------
@@ -393,7 +402,7 @@ class SimpleDeliveryEnv(gym.Env):
 
         # 6. If carrying, draw current goal as a red “X”
         if self.has_package:
-            gx, gy = self.current_goal_x, self.current_goal_y
+            gx, gy = self.delivery_goal_x, self.delivery_goal_y
             self.ax.plot([gx-0.2, gx+0.2], [gy-0.2, gy+0.2], color="red", linewidth=2)
             self.ax.plot([gx-0.2, gx+0.2], [gy+0.2, gy-0.2], color="red", linewidth=2)
 
