@@ -2,7 +2,7 @@ import torch
 import random
 import numpy as np
 from collections import deque
-from model import Linear_QNetGen3, QTrainer
+from model_custom_dqn import Linear_QNetGen3, QTrainer
 from environment2 import SimpleDeliveryEnv as Environment
 from pathlib import Path
 
