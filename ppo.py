@@ -11,8 +11,8 @@ import torch.distributions.categorical as Categorical
 from torch.utils.tensorboard import SummaryWriter
 
 import gymnasium as gym
-from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
-from gym.wrappers.record_video import RecordVideo
+from gymnasium.wrappers import RecordEpisodeStatistics
+from gymnasium.wrappers import RecordVideo
 
 from world.environment import Environment
 from pathlib import Path
@@ -22,7 +22,7 @@ def make_custom_env(idx, run_name, grid_fp, max_episode_steps=1000, render_mode=
         env = Environment(grid_fp=grid_fp, max_episode_steps=max_episode_steps, render_mode=render_mode)
         env = RecordEpisodeStatistics(env)
         if idx == 0:
-            env = RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda x: x % 100 == 0)
+            env = RecordVideo(env, f'videos/{run_name}', step_trigger=lambda step: step % 10000 == 0)
         return env
     return thunk
 
@@ -72,18 +72,18 @@ class PPOAgent(nn.Module):
         super(PPOAgent, self).__init__()
         
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
+            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 1), gain=1.0)
+            layer_init(nn.Linear(256, 1), gain=1.0)
         )
         self.actor = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
+            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), gain=0.01)
+            layer_init(nn.Linear(256, envs.single_action_space.n), gain=0.01)
         )
 
     def get_value(self, x):
@@ -256,6 +256,10 @@ class PPOTrainer:
         self.writer.close()
 
 if __name__ == "__main__":
+    # Current call
+    # python ppo.py --num-envs 8 --total-timesteps 1000000 --learning-rate 5e-5 --num-epochs 10 --entropy-coef 0.001 --num-steps=1024 --gamma 0.995 --gae-lambda 0.98 --value-loss-coef 0.5                                                                         
+
+
     args = parse_args()
     run_name = f'{args.exp_name}_custom-env_seed{args.seed}__{int(time.time())}'
 
