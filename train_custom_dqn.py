@@ -68,7 +68,7 @@ def train():
     
     # # No gui mode
     env = Environment(
-        render_mode='rgb_array',
+        render_mode='human',
     ) 
     
     agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
