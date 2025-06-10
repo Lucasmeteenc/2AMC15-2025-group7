@@ -20,7 +20,7 @@ CHARGE_RATE = 0.05          # battery charged per step when charging
 
 # Simulation parameters
 MAX_STEPS = 5_000
-NR_PACKAGES = 5
+NR_PACKAGES = 1
 
 # Rewards
 REW_STEP         = -0.2        # per time‐step
@@ -38,9 +38,6 @@ ACTIONS = {
     0: "Forward",
     1: "Turn left",
     2: "Turn right",
-    3: "Pick up",
-    4: "Deliver",
-    5: "Charge"
 }
 
 class SimpleDeliveryEnv(gym.Env):
@@ -209,9 +206,6 @@ class SimpleDeliveryEnv(gym.Env):
             case 0: self._move(MOVE_SIZE)
             case 1: self._turn(+TURN_SIZE)
             case 2: self._turn(-TURN_SIZE)
-            case 3: self._try_pickup() # mutate state if legal & set flag
-            case 4: self._try_deliver()
-            case 5: self._try_charge() 
             case _:
                 raise ValueError(f"Invalid action: '{action}'.")
 
@@ -327,16 +321,6 @@ class SimpleDeliveryEnv(gym.Env):
             self.current_goal_x = self.current_goal_y = 0.0
             return True
         return False
-
-    def _try_charge(self):
-        """Increment battery by CHARGE_RATE if standing on a charger pad."""
-        self.overcharge = False
-
-        if self._near(self.chargers):
-            if self.agent_battery >= 1.0: # check whether battery is already full
-                self.overcharge = True
-            else:
-                self.agent_battery = min(1.0, self.agent_battery + CHARGE_RATE)
     
     # --- Random Delivery Goal Sampling -----------------------------
     def _sample_goal(self):
@@ -380,18 +364,12 @@ class SimpleDeliveryEnv(gym.Env):
                     r += REW_WALL
                 # if action in (1,2):
                 #     r-= 3 # turning is more costly than moving forward
-            # Pick-Up
-            case 3:     
-                r += REW_PICKUP  if self._legal_pickup()  else REW_INVALID
-            # Deliver
-            case 4:     
-                r += REW_DELIVER if self._legal_deliver() else REW_INVALID
-            # Charge    
-            case 5:     
-                if self._near(self.chargers):
-                    r += REW_OVERCHARGE if self.overcharge else 0.0
-                else:
-                    r += REW_INVALID
+                    
+        # Check if picking up or delivering a package
+        if self._try_pickup():
+            r += REW_PICKUP
+        elif self._try_deliver():
+            r += REW_DELIVER
 
         # battery penalties
         if self.agent_battery <= 0:
