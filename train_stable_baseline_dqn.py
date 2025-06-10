@@ -17,17 +17,6 @@ ENV_NAME = "SimpleDeliveryEnv"
 
 from environment2 import SimpleDeliveryEnv
 
-def make_env_class():
-    """
-    Returns the environment class corresponding to ENV_NAME.
-    """
-    if ENV_NAME == "CustomEnv":
-        return CustomEnv
-    elif ENV_NAME == "SimpleDeliveryEnv":
-        return SimpleDeliveryEnv
-    else:
-        raise ValueError(f"Unknown ENV_NAME: {ENV_NAME}")
-
 def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_name=None):
     """
     Train a DQN agent on the given environment.
@@ -85,8 +74,7 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
     os.makedirs(tensorboard_log_path, exist_ok=True)
 
     def make_env():
-        EnvClass = make_env_class()
-        env = EnvClass(render_mode='rgb_array')
+        env = SimpleDeliveryEnv(render_mode='rgb_array')
         env = Monitor(env, log_dir)
         return env
     
@@ -166,8 +154,7 @@ def test_dqn(num_episodes=10, model_path=None):
     model = DQN.load(model_path)
     print(f"Loaded model from {model_path}")
 
-    EnvClass = make_env_class()
-    test_env = EnvClass(render_mode='human')
+    test_env = SimpleDeliveryEnv(render_mode='human')
     
     observation, _ = test_env.reset()
 
