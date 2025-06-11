@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 
-from maps import MAIL_DELIVERY_MAPS
+from maps import COMPLEX_DELIVERY_MAPS
 
 # Environment parameters
 SCALE = 4
@@ -62,7 +62,7 @@ class ComplexDeliveryEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": FPS}
 
-    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=None):
+    def __init__(self, map_config: dict = COMPLEX_DELIVERY_MAPS["default"], render_mode=None, seed=None):
         super().__init__()
 
         # 1. Init state params
