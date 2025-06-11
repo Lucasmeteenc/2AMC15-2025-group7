@@ -16,12 +16,17 @@ TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
 SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-point is in range
 
+# Region rays
+NUM_REGIONS = 8                             # number of regions around the agent
+REGION_FOV = np.deg2rad(360/NUM_REGIONS)    # fov for each region
+MAX_LIDAR_DISTANCE = 2.0                    # max distance for each lidar ray region
+
 # Simulation parameters
-MAX_STEPS = 5_000
+MAX_STEPS = 1_000
 NR_PACKAGES = 1
 
 # Rewards
-REW_PICKUP      = +250.0        # successful pickup
+REW_PICKUP      = +200.0        # successful pickup
 REW_DELIVER     = +250.0        # successful delivery
 
 # Penalties
@@ -37,12 +42,14 @@ ACTIONS = {
     2: "Turn right",
 }
 
-class SimpleDeliveryEnv(gym.Env):
+class MediumDeliveryEnv(gym.Env):
     """
     A Gymnasium env for a delivery robot that:
        - picks up packages at a single depot
        - delivers them, one at a time, to random goals
        - must avoid rectangular obstacles
+       - has a lidar sensor that provides distance readings
+       - no battery recharging, and only moving forward or turning
     """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": FPS}
@@ -75,14 +82,23 @@ class SimpleDeliveryEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.action_names))
 
         # 6. Create (normalized) observation space
-        #   1. agent_x / self.map_size[0]   6. packages_left / self.nr_packages
-        #   2. agent_y / self.map_size[1]   7. depot_x / self.map_size[0]
-        #   3. sin(agent_theta)             8. depot_y / self.map_size[1]
-        #   4. cos(agent_theta)             9. delivery_goal_x / self.map_size[0]
-        #   5. has_package                  10. delivery_goal_y / self.map_size[1]
+        #   1. agent_x / self.map_size[0]   
+        #   2. agent_y / self.map_size[1]   
+        #   3. sin(agent_theta)             
+        #   4. cos(agent_theta)             
+        #   5. has_package                  
+        #   6. packages_left / self.nr_packages 
+        #   7. depot_x / self.map_size[0]                               
+        #   8. depot_y / self.map_size[1]
+        #   9. delivery_x / self.map_size[0]
+        #   10. delivery_y / self.map_size[1]
+        #   11. NUM_REGIONS lidar distances 
 
-        low  = np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0],  dtype=np.float32)
-        high = np.ones(10, dtype=np.float32)
+        low = np.concatenate((
+            np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0]),
+            np.zeros(NUM_REGIONS)
+        )).astype(np.float32)
+        high = np.ones(10+NUM_REGIONS, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         # 7. RNG
@@ -98,9 +114,6 @@ class SimpleDeliveryEnv(gym.Env):
         self.render_mode = render_mode
         self.fig = None
         self.ax = None
-        
-        # 10. Set one fixed goal
-        # self._sample_goal()
 
     def _load_map(self, map_config: dict):
         """Check whether the provided map_config is a valid map."""
@@ -180,6 +193,9 @@ class SimpleDeliveryEnv(gym.Env):
         self.picked_up       = False
         self.delivered       = False
 
+        # init raw lidar distances (0…MAX)
+        self._last_lidar = self.lidar_fixed_rays()
+
         obs = self._get_obs()
         info = {}
         if self.render_mode == "human":
@@ -206,6 +222,9 @@ class SimpleDeliveryEnv(gym.Env):
         terminated = (self.packages_left == 0)
         self.steps+=1
         truncated = (self.steps >= self.max_steps)
+
+        # store lidar distances
+        self._last_lidar = self.lidar_fixed_rays()
         
         obs = self._get_obs()
         info = {}
@@ -215,7 +234,7 @@ class SimpleDeliveryEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _get_obs(self):
-        "Return a 10-dimensional observation vector."
+        "Return a (10+NUM_REGIONS)-dimensional observation vector."
 
         # relative vectors to static landmarks
         vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
@@ -227,7 +246,7 @@ class SimpleDeliveryEnv(gym.Env):
         else:
             vec_goal = np.zeros(2, dtype=np.float32)
 
-        return np.array([
+        base = np.array([
             self.agent_x / self.map_size[0],
             self.agent_y / self.map_size[1],
             np.sin(self.agent_theta),
@@ -237,6 +256,10 @@ class SimpleDeliveryEnv(gym.Env):
             vec_depot[0], vec_depot[1],
             vec_goal[0],  vec_goal[1],
         ], dtype=np.float32)
+
+        # get lidar distances
+        lidar = self._last_lidar / MAX_LIDAR_DISTANCE
+        return np.concatenate((base, lidar)).astype(np.float32)
 
     # --- Motion Action Checks --------------------------------------
 
@@ -374,8 +397,86 @@ class SimpleDeliveryEnv(gym.Env):
             return False
         xmin, ymin, xmax, ymax = self.obstacles.T
         return np.any((xmin <= x) & (x <= xmax) & (ymin <= y) & (y <= ymax))
-    
-    # --- 3.11  render & close --------------------------------------
+
+    def ray_segment_intersection(self, x0, y0, dx, dy, ax, ay, bx, by):
+        """
+        Compute intersection of the ray (x0,y0) + t*(dx,dy), t>=0 with segment [A(ax,ay) -> B(bx,by)]
+        by solving the intersection equation (x0,y0) + t*(dx,dy) = (ax,ay) + u*(bx-ax, by-ay)
+        Returns t (distance along ray) if intersects within segment and t>=0, else None.
+        """
+
+        # parameterize the segment AB
+        ex, ey = bx - ax, by - ay
+        denom = dx*ey - dy*ex
+        # return None if segment and ray are parallel or collinear
+        if abs(denom) < 1e-8:
+            return None
+        # solve using Cramer's rule
+        rx, ry = ax - x0, ay - y0
+        t = (rx*ey - ry*ex) / denom
+        u = (rx*dy - ry*dx) / denom
+        # only accept if intersection lies in front of ray and within the segment
+        if t >= 0 and 0 <= u <= 1:
+            return t
+        return None
+
+    def lidar_fixed_rays(self):
+        """
+        Cast NUM_REGIONS rays at angles (agent_theta + k*45°), and find first obstacle or
+        wall hit within MAX_LIDAR_DISTANCE if any.
+        Returns: distances[k] for k=0..NUM_REGIONS-1
+        """
+        W, H = self.map_size
+        # compile list of all segments: walls + obstacle edges
+        segments = [
+            (0, 0, W, 0), (W, 0, W, H), (W, H, 0, H), (0, H, 0, 0)
+        ]
+        # obstacle edges
+        for xmin, ymin, xmax, ymax in self.obstacles:
+            corners = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+            for i in range(4):
+                ax, ay = corners[i]
+                bx, by = corners[(i + 1) % 4]
+                segments.append((ax, ay, bx, by))
+
+        # compute distances for each ray and select the closest intersection
+        distances = np.full(NUM_REGIONS, MAX_LIDAR_DISTANCE, dtype=np.float32)
+        for k in range(NUM_REGIONS):
+            theta = self.agent_theta + k * REGION_FOV
+            dx, dy = np.cos(theta), np.sin(theta)
+            best = MAX_LIDAR_DISTANCE
+            for ax, ay, bx, by in segments:
+                t = self.ray_segment_intersection(
+                    self.agent_x, self.agent_y, dx, dy, ax, ay, bx, by
+                )
+                if t is not None and t < best:
+                    best = t
+            distances[k] = best
+        return distances
+
+    # def lidar_wedges(self):
+    #     W, H = self.map_size
+    #     all_boxes = self.map_config["obstacles"] + [
+    #         (0, 0, W, 0), (W, 0, W, H), (W, H, 0, H), (0, H, 0, 0)
+    #     ]
+    #     distances = np.full(NUM_REGIONS, MAX_LIDAR_DISTANCE, dtype=float)
+
+    #     for xmin, ymin, xmax, ymax in all_boxes:
+    #         px = np.clip(self.agent_x, xmin, xmax)
+    #         py = np.clip(self.agent_y, ymin, ymax)
+    #         if xmin < self.agent_x < xmax and ymin < self.agent_y < ymax:
+    #             continue
+    #         dx, dy = px - self.agent_x, py - self.agent_y
+    #         dist = np.hypot(dx, dy)
+    #         if dist == 0 or dist > MAX_LIDAR_DISTANCE:
+    #             continue
+    #         phi = (np.arctan2(dy, dx) % (2 * np.pi))
+    #         k = int(phi // REGION_FOV)
+    #         distances[k] = min(distances[k], dist)
+
+    #     return distances
+
+    # --- render & close --------------------------------------
     
     def render(self):
         """
@@ -429,6 +530,19 @@ class SimpleDeliveryEnv(gym.Env):
         self.ax.text(0.02 * self.W, 0.94 * self.H,
                     f"{pkg_text}, Left: {self.packages_left}", color="black",
                     fontsize=8, verticalalignment="top")
+
+        # 8. Draw lidar rays as lines
+        for k, d in enumerate(self._last_lidar):
+            angle = self.agent_theta + k * REGION_FOV
+            x2 = self.agent_x + d * np.cos(angle)
+            y2 = self.agent_y + d * np.sin(angle)
+            norm = d / MAX_LIDAR_DISTANCE
+            r = 1.0 - norm
+            g = norm
+            self.ax.plot([self.agent_x, x2],
+                        [self.agent_y, y2],
+                        color=(r, g, 0),
+                        linewidth=1)
 
         # 9. Finalize for human or rgb_array
         if self.render_mode == "human":
