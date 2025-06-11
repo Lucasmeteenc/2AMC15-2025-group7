@@ -8,11 +8,13 @@ from matplotlib.patches import Rectangle, Circle
 from maps import MAIL_DELIVERY_MAPS
 
 # Environment parameters
-MOVE_SIZE = 0.5             # distance covered for forward action
-TURN_SIZE = np.deg2rad(10)  # 10 degrees in radians
+SCALE = 4
+
+MOVE_SIZE = 0.5 * SCALE         # distance covered for forward action
+TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 
 NOISE_SIGMA = 0.01          # Gaussian noise on x,y after each move
-SENSE_RADIUS = 0.5         # radius to check whether pickup-/delivery-
+SENSE_RADIUS = 0.5 * SCALE        # radius to check whether pickup-/delivery-
 
 # Simulation parameters
 MAX_STEPS = 5_000
@@ -397,14 +399,15 @@ class SimpleDeliveryEnv(gym.Env):
 
         # 4. Draw depot as a small green square
         self.ax.add_patch(
-            Rectangle((self.depot[0]-0.2, self.depot[1]-0.2), 0.4, 0.4, color="green")
+            Rectangle((self.depot[0]-0.2, self.depot[1]-0.2), 0.4 * SCALE, 0.4 * SCALE, color="green")
         )
 
         # 6. If carrying, draw current goal as a red “X”
         if self.has_package:
             gx, gy = self.delivery_goal_x, self.delivery_goal_y
-            self.ax.plot([gx-0.2, gx+0.2], [gy-0.2, gy+0.2], color="red", linewidth=2)
-            self.ax.plot([gx-0.2, gx+0.2], [gy+0.2, gy-0.2], color="red", linewidth=2)
+            offset = 0.2 * SCALE
+            self.ax.plot([gx-offset, gx+offset], [gy-offset, gy+offset], color="red", linewidth=2 * SCALE)
+            self.ax.plot([gx-offset, gx+offset], [gy+offset, gy-offset], color="red", linewidth=2 * SCALE)
 
         # 7. Draw robot as a blue circle + arrow for orientation
         robot_circle = Circle((self.agent_x, self.agent_y), 0.3, color="blue", alpha=0.8)
