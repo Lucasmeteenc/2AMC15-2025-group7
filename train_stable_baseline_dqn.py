@@ -15,7 +15,8 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 # Possible values: "CustomEnv" (from environment.py), "SimpleDeliveryEnv" (from environment2.py)
 ENV_NAME = "SimpleDeliveryEnv"
 
-from environment2 import SimpleDeliveryEnv
+# from environment2 import SimpleDeliveryEnv
+from environments.simple_delivery_env import SimpleDeliveryEnv
 
 def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_name=None):
     """

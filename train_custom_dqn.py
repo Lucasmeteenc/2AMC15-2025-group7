@@ -3,8 +3,10 @@ import random
 import numpy as np
 from collections import deque
 from model_custom_dqn import Linear_QNetGen3, QTrainer
-from environment2 import SimpleDeliveryEnv as Environment
 from pathlib import Path
+
+# from environment2 import SimpleDeliveryEnv as Environment
+from environments.simple_delivery_env import SimpleDeliveryEnv as Environment
 
 np.set_printoptions(linewidth=np.inf)
 max_mem = 10_000

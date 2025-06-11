@@ -14,7 +14,8 @@ import torch.distributions as distributions
 import argparse
 import os, csv
 
-from environment2 import SimpleDeliveryEnv
+# from environment2 import SimpleDeliveryEnv
+from environments.simple_delivery_env import SimpleDeliveryEnv
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PPO Training Configuration')
