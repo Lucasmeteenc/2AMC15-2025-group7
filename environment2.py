@@ -13,19 +13,19 @@ SCALE = 4
 MOVE_SIZE = 0.5 * SCALE         # distance covered for forward action
 TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 
-NOISE_SIGMA = 0.01          # Gaussian noise on x,y after each move
-SENSE_RADIUS = 0.5 * SCALE        # radius to check whether pickup-/delivery-
+NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
+SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-
 
 # Simulation parameters
 MAX_STEPS = 5_000
 NR_PACKAGES = 1
 
 # Rewards
-REW_STEP         = -0.2        # per time‐step
-REW_PICKUP       = +200.0      # successful pickup
-REW_DELIVER      = +250.0      # successful delivery
-REW_OBSTACLE     = -0.5        # penalty on hitting an obstacle
-REW_WALL         = -0.5        # penalty for going out of bounds
+REW_STEP        = -0.2          # per time‐step
+REW_PICKUP      = +200.0        # successful pickup
+REW_DELIVER     = +250.0        # successful delivery
+REW_OBSTACLE    = -0.5          # penalty on hitting an obstacle
+REW_WALL        = -0.5          # penalty for going out of bounds
 
 FPS = 30
 
@@ -259,15 +259,14 @@ class SimpleDeliveryEnv(gym.Env):
         self.agent_x += self.rng.normal(0, NOISE_SIGMA)
         self.agent_y += self.rng.normal(0, NOISE_SIGMA)
 
-        # clip to map bounds
-        clipped_x = not (0 <= self.agent_x <= self.map_size[0])
-        clipped_y = not (0 <= self.agent_y <= self.map_size[1])
-        if clipped_x or clipped_y:
-            self.agent_x = np.clip(self.agent_x, 0, self.map_size[0])
-            self.agent_y = np.clip(self.agent_y, 0, self.map_size[1])
+        # revert to previous position if out of bounds
+        if not (
+            0 <= self.agent_x <= self.map_size[0]
+            and 0 <= self.agent_y <= self.map_size[1]):
+            self.agent_x, self.agent_y = prev_x, prev_y
             self.hit_wall = True
 
-        # check for collisions with obstacles
+        # revert to previous position if colliding with obstacles
         if self._in_obstacle(self.agent_x, self.agent_y):
             self.agent_x, self.agent_y = prev_x, prev_y
             self.bumped_obstacle = True        
