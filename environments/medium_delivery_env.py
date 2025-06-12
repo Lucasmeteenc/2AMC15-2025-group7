@@ -95,7 +95,7 @@ class MediumDeliveryEnv(gym.Env):
         #   11. NUM_REGIONS lidar distances 
 
         low = np.concatenate((
-            np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0, 0]),
+            np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0]),
             np.zeros(NUM_REGIONS)
         )).astype(np.float32)
         high = np.ones(10+NUM_REGIONS, dtype=np.float32)

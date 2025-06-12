@@ -14,11 +14,26 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 
 # --- define env ----------------------------------------------------
-# Possible values: "CustomEnv" (from environment.py), "SimpleDeliveryEnv" (from environment2.py)
-ENV_NAME = "SimpleDeliveryEnv"
+# Possible values: "SimpleDeliveryEnv", "MediumDeliveryEnv", "ComplexDeliveryEnv"
+ENV_NAME = "MediumDeliveryEnv"  
 
-# from environment2 import SimpleDeliveryEnv
-from environments.simple_delivery_env import SimpleDeliveryEnv
+from environments.simple_delivery_env  import SimpleDeliveryEnv
+from environments.medium_delivery_env   import MediumDeliveryEnv
+from environments.complex_delivery_env  import ComplexDeliveryEnv
+
+def make_env_class():
+    """
+    Returns the environment class corresponding to ENV_NAME.
+    """
+    if ENV_NAME == "SimpleDeliveryEnv":
+        return SimpleDeliveryEnv
+    elif ENV_NAME == "MediumDeliveryEnv":
+        return MediumDeliveryEnv
+    elif ENV_NAME == "ComplexDeliveryEnv":
+        return ComplexDeliveryEnv
+    else:
+        raise ValueError(f"Unknown ENV_NAME: {ENV_NAME}")
+
 
 def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_name=None):
     """
@@ -79,7 +94,9 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
 
     def make_env():
         # setup env
-        env = SimpleDeliveryEnv(render_mode='rgb_array')
+        EnvClass = make_env_class()
+
+        env = EnvClass(render_mode='rgb_array')
 
         # setup csv for monitoring
         os.makedirs(log_dir, exist_ok=True)
@@ -166,7 +183,8 @@ def test_dqn(num_episodes=10, model_path=None):
     model = DQN.load(model_path)
     print(f"Loaded model from {model_path}")
 
-    test_env = SimpleDeliveryEnv(render_mode='human')
+    EnvClass = make_env_class()
+    test_env = EnvClass(render_mode='human')
     
     observation, _ = test_env.reset()
 
