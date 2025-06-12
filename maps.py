@@ -13,6 +13,21 @@ MAIL_DELIVERY_MAPS = {
             (1, 3, 3, 8),      
             (3, 4, 7, 5),     
         ],
+    },
+    "same_x": {
+        # ── overall dimensions ──────────────────────────────────────────────
+        "size": (10.0, 10.0),          # W, H  in metres
+
+        # ── fixed locations ────────────────────────────────────────────────
+        "depot": (5.0, 1.0),           # lone pick-up point
+        "delivery": (7.0, 9.0),      # lone drop-off point
+
+        # ── obstacles (axis-aligned boxes) ─────────────────────────────────
+        #    xmin, ymin, xmax, ymax
+        "obstacles": [
+            (1, 3, 3, 8),      
+            (3, 4, 7, 5),     
+        ],
     }
 }
 

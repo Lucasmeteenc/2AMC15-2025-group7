@@ -544,7 +544,7 @@ class ComplexDeliveryEnv(gym.Env):
 
         # 4. Draw depot as a small green square
         self.ax.add_patch(
-            Rectangle((self.depot[0]-0.2, self.depot[1]-0.2), 0.4*SCALE, 0.4*SCALE, color="green")
+            Rectangle((self.depot[0]-0.2*SCALE, self.depot[1]-0.2*SCALE), 0.4*SCALE, 0.4*SCALE, color="green")
         )
 
         # 5. Draw chargers as yellow circles
