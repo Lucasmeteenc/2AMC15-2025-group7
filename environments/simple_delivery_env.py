@@ -8,13 +8,13 @@ from matplotlib.patches import Rectangle, Circle
 from maps import MAIL_DELIVERY_MAPS
 
 # Environment parameters
-SCALE = 1
+SCALE = 4
 
-MOVE_SIZE = 0.5 * SCALE         # distance covered for forward action
+MOVE_SIZE = 0.5         # distance covered for forward action
 TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 
 NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
-SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-point is in range
+SENSE_RADIUS = 0.45 * SCALE             # radius to check whether pickup-/delivery-point is in range
 
 # Simulation parameters
 MAX_STEPS = 5_000
@@ -143,6 +143,20 @@ class SimpleDeliveryEnv(gym.Env):
             any((not isinstance(o, (tuple, list)) or len(o) != 4) for o in obstacles)):
             raise ValueError("map_config['obstacles'] must be a list of 4-tuples [(xmin,ymin,xmax,ymax), …]")
         self.obstacles = np.array(obstacles, dtype=np.float32)
+        
+        # Check scale parameter: Apply scaling to all coordinates
+        if "map_scale" in map_config:
+            scale = map_config["map_scale"]
+            if not isinstance(scale, (int, float)) or scale <= 0:
+                raise ValueError("map_config['scale'] must be a positive number")
+            # self.W /= scale
+            # self.H /= scale
+            self.map_size /= scale
+            self.depot /= scale
+            self.obstacles /= scale
+            if delivery is not None:
+                self.delivery_goal_x /= scale
+                self.delivery_goal_y /= scale
 
         return map_config
     
