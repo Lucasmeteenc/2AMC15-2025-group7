@@ -8,7 +8,7 @@ from matplotlib.patches import Rectangle, Circle
 from maps import MAIL_DELIVERY_MAPS
 
 # Environment parameters
-SCALE = 4
+SCALE = 1
 
 MOVE_SIZE = 0.5 * SCALE         # distance covered for forward action
 TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
@@ -26,8 +26,8 @@ REW_DELIVER     = +250.0        # successful delivery
 
 # Penalties
 REW_STEP        = -0.2          # per time‐step
-REW_OBSTACLE    = -5            # penalty on hitting an obstacle
-REW_WALL        = -5            # penalty for going out of bounds
+REW_OBSTACLE    = -1000         # penalty on hitting an obstacle
+REW_WALL        = -1000         # penalty for going out of bounds
 
 FPS = 30
 

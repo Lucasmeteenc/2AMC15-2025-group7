@@ -1,9 +1,11 @@
 import os
 
+# Import necessary libraries
 import torch
-import wandb # Import wandb
+import wandb
 from wandb.integration.sb3 import WandbCallback # Import W&B callback for SB3
 
+# stable_baselines3 imports
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
@@ -26,7 +28,8 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
     :param total_timesteps: Total number of timesteps for training.
     :return: The trained DQN model.
     """
-    log_dir = 'logs/'
+
+    log_dir = 'results/logs/'
     model_save_dir = os.path.join(log_dir, 'dqn_models_local')
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_save_dir, exist_ok=True)
@@ -45,17 +48,17 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
         "env_name": ENV_NAME,
         "policy_type": "MlpPolicy",
         "total_timesteps": total_timesteps,
-        "learning_rate": 1e-1,
+        "learning_rate": 1e-4, # default DQN lr in SB3 is 1e-4 (see Nature DQN paper) 
         "buffer_size": 100000,
         "learning_starts": 10000,
         "batch_size": 64,
-        "tau": 1.0,
+        "tau": 0.005, # 1.0: any update to target network fully overwrites the online network
         "gamma": 0.99,
         "train_freq": 4,
-        "gradient_steps": 1,
-        "exploration_fraction": 0.7,
+        "gradient_steps": -1, # # -1: do as many gradient steps as train_freq
+        "exploration_fraction": 0.3, # fraction of training period over which the exploration rate is reduced
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.1,
+        "exploration_final_eps": 0.05,
         "policy_kwargs": dict(net_arch=[128, 128]),
         "device": device,
     }
@@ -66,7 +69,7 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
         name=run_name,
         config=config,
         sync_tensorboard=True,  # Automatically sync SB3's TensorBoard logs
-        monitor_gym=True,       # Automatically log videos of the environment
+        monitor_gym=False,       #! Automatically log videos of the environment -> set to False bc VecVideoRecorder also records videos
         save_code=True,         # Save the main script to W&B
     )
 
@@ -75,16 +78,24 @@ def train_dqn(total_timesteps=pow(10,6), project_name="custom_robot_rl", run_nam
     os.makedirs(tensorboard_log_path, exist_ok=True)
 
     def make_env():
+        # setup env
         env = SimpleDeliveryEnv(render_mode='rgb_array')
-        env = Monitor(env, log_dir)
+
+        # setup csv for monitoring
+        os.makedirs(log_dir, exist_ok=True)
+        monitor_file = os.path.join(log_dir, f"monitor_{run.id}.csv")
+        env = Monitor(env, filename=monitor_file) #! change: Monitor expects a file name, not a directory
         return env
     
     vec_env = DummyVecEnv([make_env])
 
     # VERY SLOW RECORDING. reduced to 150 frames.
-    vec_env = VecVideoRecorder(vec_env, f"videos/{run.id}",
-                               record_video_trigger=lambda x: x % 100000 == 0, # Record every 20000 steps --> this does mean that the video at the end of training will only be one frame
-                               video_length=150) # Max length of recorded video
+    vec_env = VecVideoRecorder(
+        vec_env,
+        f"results/videos/{run.id}",
+        record_video_trigger=lambda x: x % 20000 == 0, # Record every 20000 steps --> this does mean that the video at the end of training will only be one frame
+        video_length=500 # Max length of recorded video
+    )
 
     model = DQN(
         config['policy_type'],
