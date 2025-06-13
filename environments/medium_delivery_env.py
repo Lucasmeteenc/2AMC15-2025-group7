@@ -8,31 +8,33 @@ from matplotlib.patches import Rectangle, Circle
 from maps import MAIL_DELIVERY_MAPS
 
 # Environment parameters
-SCALE = 4
+SCALE = 1
 
-MOVE_SIZE = 0.5 * SCALE         # distance covered for forward action
+MOVE_SIZE = 0.5                 # distance covered for forward action
 TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 
 NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
 SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-point is in range
 
 # Region rays
-NUM_REGIONS = 8                             # number of regions around the agent
+NUM_REGIONS = 10                            # number of regions around the agent
 REGION_FOV = np.deg2rad(360/NUM_REGIONS)    # fov for each region
 MAX_LIDAR_DISTANCE = 2.0                    # max distance for each lidar ray region
 
 # Simulation parameters
-MAX_STEPS = 1_000
+MAX_STEPS = 750
+MAX_BUMPS = 50  
 NR_PACKAGES = 1
 
 # Rewards
-REW_PICKUP      = +200.0        # successful pickup
-REW_DELIVER     = +250.0        # successful delivery
+REW_PICKUP      = +100.0        # successful pickup
+REW_DELIVER     = +300.0        # successful delivery
 
 # Penalties
-REW_STEP        = -0.2          # per time‐step
-REW_OBSTACLE    = -5            # penalty on hitting an obstacle
+REW_STEP        = -0.5          # per time‐step
+REW_OBSTACLE    = -5            # penalty on hitting an obstacle; should never happen
 REW_WALL        = -5            # penalty for going out of bounds
+REW_LIDAR       = -0.1          # penalty for being very close to a wall
 
 FPS = 30
 
@@ -95,10 +97,10 @@ class MediumDeliveryEnv(gym.Env):
         #   11. NUM_REGIONS lidar distances 
 
         low = np.concatenate((
-            np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0]),
+            np.array([0, 0, -1, -1, 0, 0,]),# 0, 0, 0, 0]),
             np.zeros(NUM_REGIONS)
         )).astype(np.float32)
-        high = np.ones(10+NUM_REGIONS, dtype=np.float32)
+        high = np.ones(6+NUM_REGIONS, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         # 7. RNG
@@ -219,6 +221,7 @@ class MediumDeliveryEnv(gym.Env):
                 raise ValueError(f"Invalid action: '{action}'.")
 
         reward = self._reward_fn(action)
+        # terminated = self.hit_wall or self.bumped_obstacle or (self.packages_left == 0) #! terminate when agent hits wall or obstacle
         terminated = (self.packages_left == 0)
         self.steps+=1
         truncated = (self.steps >= self.max_steps)
@@ -237,14 +240,14 @@ class MediumDeliveryEnv(gym.Env):
         "Return a (10+NUM_REGIONS)-dimensional observation vector."
 
         # relative vectors to static landmarks
-        vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
+        # vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
 
         # relative vectors to current goal if package is held
-        if self.has_package:
-            vec_goal = (np.array([self.delivery_goal_x, self.delivery_goal_y]) -
-                        np.array([self.agent_x, self.agent_y])) / self.dmax
-        else:
-            vec_goal = np.zeros(2, dtype=np.float32)
+        # if self.has_package:
+        #     vec_goal = (np.array([self.delivery_goal_x, self.delivery_goal_y]) -
+        #                 np.array([self.agent_x, self.agent_y])) / self.dmax
+        # else:
+        #     vec_goal = np.zeros(2, dtype=np.float32)
 
         base = np.array([
             self.agent_x / self.map_size[0],
@@ -253,8 +256,8 @@ class MediumDeliveryEnv(gym.Env):
             np.cos(self.agent_theta),
             float(self.has_package),
             self.packages_left / self.nr_packages,
-            vec_depot[0], vec_depot[1],
-            vec_goal[0],  vec_goal[1],
+            # vec_depot[0], vec_depot[1],
+            # vec_goal[0],  vec_goal[1],
         ], dtype=np.float32)
 
         # get lidar distances
@@ -495,7 +498,7 @@ class MediumDeliveryEnv(gym.Env):
         self.ax.set_xlim(0, self.W)
         self.ax.set_ylim(0, self.H)
         self.ax.set_aspect('equal', adjustable='box')
-        self.ax.set_title("SimpleDeliveryEnv")
+        self.ax.set_title("MediumDeliveryEnv")
         self.ax.set_xticks([])
         self.ax.set_yticks([])
 
@@ -525,11 +528,31 @@ class MediumDeliveryEnv(gym.Env):
         self.ax.arrow(self.agent_x, self.agent_y, dx, dy,
                     head_width=0.15, head_length=0.15, fc="blue", ec="blue")
 
-        # 7. Draw package count in top-left
+        # 7a. Draw steps-left in top-left
+        steps_left = self.max_steps - self.steps
+        self.ax.text(
+            0.02 * self.W, 0.98 * self.H,
+            f"Steps left: {steps_left}",
+            color="black",
+            fontsize=8,
+            verticalalignment="top"
+        )
+
+        # 7b. Draw package count in top-left
         pkg_text = "Carrying" if self.has_package else "Empty"
         self.ax.text(0.02 * self.W, 0.94 * self.H,
                     f"{pkg_text}, Left: {self.packages_left}", color="black",
                     fontsize=8, verticalalignment="top")
+        
+        # 7c. Draw current epsilon
+        if hasattr(self, "model") and hasattr(self.model, "exploration_rate"):
+            eps = self.model.exploration_rate
+            self.ax.text(
+                0.02 * self.W, 0.90 * self.H,
+                f"Epsilon: {eps:.2f}",
+                color="black", fontsize=8, verticalalignment="top"
+            )
+
 
         # 8. Draw lidar rays as lines
         for k, d in enumerate(self._last_lidar):

@@ -10,11 +10,9 @@
 .LSOverride
 
 # Auto encoder log
-results/videos/
 /wandb/
 /models/
-results/logs/
-
+/results/
 # Icon must end with two \r
 Icon
 

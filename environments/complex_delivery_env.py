@@ -532,7 +532,7 @@ class ComplexDeliveryEnv(gym.Env):
         self.ax.set_xlim(0, self.W)
         self.ax.set_ylim(0, self.H)
         self.ax.set_aspect('equal', adjustable='box')
-        self.ax.set_title("SimpleDeliveryEnv")
+        self.ax.set_title("ComplexDeliveryEnv")
         self.ax.set_xticks([])
         self.ax.set_yticks([])
 
