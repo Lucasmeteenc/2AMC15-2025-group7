@@ -16,7 +16,6 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 ENV_NAME = "CustomEnv"
 
 from world.environment import Environment as CustomEnv
-# from environment2 import SimpleDeliveryEnv
 
 def make_env_class():
     """

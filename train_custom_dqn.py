@@ -4,6 +4,8 @@ import numpy as np
 from collections import deque
 from model_custom_dqn import Linear_QNetGen3, QTrainer
 from pathlib import Path
+import maps
+import maps_advanced
 
 # from environment2 import SimpleDeliveryEnv as Environment
 from environments.simple_delivery_env import SimpleDeliveryEnv as Environment
@@ -11,7 +13,7 @@ from environments.simple_delivery_env import SimpleDeliveryEnv as Environment
 np.set_printoptions(linewidth=np.inf)
 max_mem = 10_000
 batch_size = 1000
-lr = 0.001
+lr = 0.005
 
 class Agent:
     def __init__(self, observation_space, action_space):
@@ -71,6 +73,8 @@ def train():
     # # No gui mode
     env = Environment(
         render_mode='human',
+        # map_config=maps.MAIL_DELIVERY_MAPS['inside'],
+        map_config=maps_advanced.MAIL_DELIVERY_MAPS_ADVANCED['maze'],
     ) 
     
     agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
@@ -82,9 +86,10 @@ def train():
     old_reward = 0
     cummulative_reward = 0
     for i in range(1_000_000):
+        print(f"Step {i}, Epsilon: {agent.epsilon:.2f}")
         if i % 100 == 0:
             # print(i)
-            agent.epsilon = max(0.1, agent.epsilon * 0.99)
+            agent.epsilon = max(0.1, agent.epsilon * 0.98)
 
         # get move
         final_move = agent.get_action(state_old)
