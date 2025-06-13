@@ -16,7 +16,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from wandb.integration.sb3 import WandbCallback
 
 # --- Set Seed for Reproducibility -----------------------------------
-SEED = 42
+SEED = None#42
 if SEED:
     random.seed(SEED)
     np.random.seed(SEED)
@@ -60,25 +60,52 @@ def train_dqn(project_name="MediumDeliveryEnv-DQN", run_name=None, total_timeste
     print(f"Using device: {device}")
 
     # --- W&B and Hyperparameter Configuration --------------------------
+    # config = {
+    #     "policy_type": "MlpPolicy",
+    #     "total_timesteps": total_timesteps,
+    #     "env_name": "MediumDeliveryEnv",
+    #     "map_config": "default",
+    #     "learning_rate": 1e-4,
+    #     "buffer_size": 100_000,
+    #     "learning_starts": 50_000,
+    #     "batch_size": 64,
+    #     "tau": 1.0,
+    #     "gamma": 0.99,
+    #     "train_freq": (4, "step"),
+    #     "gradient_steps": 1,
+    #     "exploration_fraction": 0.5,
+    #     "exploration_initial_eps": 1.0,
+    #     "exploration_final_eps": 0.05,
+    #     "policy_kwargs": dict(net_arch=[256, 256]),
+    #     # "seed": SEED,
+    #     "device": device
+    # }
     config = {
-        "policy_type": "MlpPolicy",
-        "total_timesteps": total_timesteps,
-        "env_name": "MediumDeliveryEnv",
-        "map_config": "default",
-        "learning_rate": 1e-4,
-        "buffer_size": 100_000,
-        "learning_starts": 50_000,
-        "batch_size": 64,
-        "tau": 1.0,
-        "gamma": 0.99,
-        "train_freq": (4, "step"),
-        "gradient_steps": 1,
-        "exploration_fraction": 0.5,
+        "policy_type"           : "MlpPolicy",
+        "total_timesteps"       : total_timesteps,
+        # environment
+        "env_name"              : "MediumDeliveryEnv",
+        "map_config"            : "default",
+        # optimizer
+        "learning_rate"         : 5e-5,
+        "batch_size"            : 128,
+        "gradient_steps"        : 2,
+        # replay & targets
+        "buffer_size"           : 100_000,
+        "learning_starts"       : 75_000,
+        "tau"                   : 1.0,
+        "gamma"                 : 0.99,
+        # frequency
+        "train_freq"            : (4, "step"),
+        # e-greedy schedule
+        "exploration_fraction"  : 0.6,
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
-        "policy_kwargs": dict(net_arch=[256, 256]),
-        # "seed": SEED,
-        "device": device
+        "exploration_final_eps" : 0.02,
+        # net
+        "policy_kwargs"         : dict(net_arch=[256, 256]),
+        # misc
+        "seed"                  : SEED,
+        "device"                : device
     }
 
     # --- Initialize W&B Run --------------------------------------------
