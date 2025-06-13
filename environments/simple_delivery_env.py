@@ -21,13 +21,13 @@ MAX_STEPS = 5_000
 NR_PACKAGES = 1
 
 # Rewards
-REW_PICKUP      = +250.0        # successful pickup
-REW_DELIVER     = +250.0        # successful delivery
+REW_PICKUP      = +100.0        # successful pickup
+REW_DELIVER     = +300.0        # successful delivery
 
 # Penalties
-REW_STEP        = -0.2          # per time‐step
-REW_OBSTACLE    = -1000         # penalty on hitting an obstacle
-REW_WALL        = -1000         # penalty for going out of bounds
+REW_STEP        = -0.5          # per time‐step
+REW_OBSTACLE    = -5            # penalty on hitting an obstacle
+REW_WALL        = -5            # penalty for going out of bounds
 
 FPS = 30
 

@@ -21,7 +21,7 @@ TURN_DRAIN = 0.0005             # battery consumed for turn action
 CHARGE_RATE = 0.05              # battery charged per step when charging
 
 # Region rays
-NUM_REGIONS = 8                             # number of regions around the agent
+NUM_REGIONS = 10                            # number of regions around the agent
 REGION_FOV = np.deg2rad(360/NUM_REGIONS)    # fov for each region
 MAX_LIDAR_DISTANCE = 2.0                    # max distance for each lidar ray region
 
@@ -30,13 +30,13 @@ MAX_STEPS = 1_000
 NR_PACKAGES = 1
 
 # Rewards
-REW_STEP         = -0.2        # per time‐step
-REW_PICKUP       = +200.0      # successful pickup
-REW_DELIVER      = +250.0      # successful delivery
-REW_INVALID      = -1          # invalid pickup/delivery/charge attempt
-REW_BATTERY_DEAD = -500.0      # battery fell to zero
-REW_OBSTACLE     = -200        # penalty on hitting an obstacle
-REW_WALL         = -200        # penalty for going out of bounds
+REW_STEP         = -0.5        # per time‐step
+REW_PICKUP       = +100.0      # successful pickup
+REW_DELIVER      = +300.0      # successful delivery
+REW_INVALID      = -5          # invalid pickup/delivery/charge attempt
+REW_BATTERY_DEAD = -9999       # battery fell to zero
+REW_OBSTACLE     = -5          # penalty on hitting an obstacle
+REW_WALL         = -5          # penalty for going out of bounds
 REW_OVERCHARGE   = -1          # penalty for standing on charger and charging when battery is full
 
 FPS = 30
