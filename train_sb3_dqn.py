@@ -4,10 +4,6 @@ import numpy as np
 import torch
 import wandb
 
-# Import the environment and maps
-from environments.medium_delivery_env import MediumDeliveryEnv
-from maps import MAIL_DELIVERY_MAPS
-
 # Stable Baselines3 imports
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
@@ -15,12 +11,45 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from wandb.integration.sb3 import WandbCallback
 
-# --- Set Seed for Reproducibility -----------------------------------
+
+# --- define environment --------------------------------------------
+# possible values: "SimpleDeliveryEnv", "MediumDeliveryEnv", "ComplexDeliveryEnv"
+ENV_NAME = "SimpleDeliveryEnv"
+MAP_NAME = "default"
+TOTAL_TIME_STEPS = 5 * pow(10,6)
+# -------------------------------------------------------------------
+
+# import environments and maps
+from environments.simple_delivery_env  import SimpleDeliveryEnv
+from environments.medium_delivery_env   import MediumDeliveryEnv
+from environments.complex_delivery_env  import ComplexDeliveryEnv
+from maps import MAIL_DELIVERY_MAPS, COMPLEX_DELIVERY_MAPS
+
+ENV_REGISTRY = {
+    "SimpleDeliveryEnv" : (SimpleDeliveryEnv, MAIL_DELIVERY_MAPS),
+    "MediumDeliveryEnv" : (MediumDeliveryEnv, MAIL_DELIVERY_MAPS),
+    "ComplexDeliveryEnv": (ComplexDeliveryEnv, COMPLEX_DELIVERY_MAPS),
+}
+
+# --- Set Seed for Reproducibility ----------------------------------
+# !DONT USE THIS: IMPLEMENTED INCORRECTLY.
 SEED = None#42
 if SEED:
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
+
+def resolve_env(env_name: str = ENV_NAME):
+    """
+    Return the env class and its map dictionary from ENV_REGISTRY.
+    """
+    try:
+        return ENV_REGISTRY[env_name]
+    except KeyError as e:
+        raise ValueError(
+            f"Unknown ENV_NAME '{env_name}'. "
+            f"Valid options: {list(ENV_REGISTRY)}"
+        ) from e
 
 class EpsilonLoggerCallback(BaseCallback):
     """
@@ -32,9 +61,9 @@ class EpsilonLoggerCallback(BaseCallback):
         self.logger.record("rollout/ep_exploration_rate", epsilon)
         return True
 
-def train_dqn(project_name="MediumDeliveryEnv-DQN", run_name=None, total_timesteps=1_000_000):
+def train_dqn(project_name="SB3-DQN", run_name=None, total_timesteps=1_000_000):
     """
-    Trains a DQN agent on the MediumDeliveryEnv.
+    Trains an SB3 DQN agent on some DeliveryEnv.
 
     Args:
         project_name (str): The name of the W&B project.
@@ -84,8 +113,8 @@ def train_dqn(project_name="MediumDeliveryEnv-DQN", run_name=None, total_timeste
         "policy_type"           : "MlpPolicy",
         "total_timesteps"       : total_timesteps,
         # environment
-        "env_name"              : "MediumDeliveryEnv",
-        "map_config"            : "default",
+        "env_name"              : ENV_NAME,
+        "map_config"            : MAP_NAME,
         # optimizer
         "learning_rate"         : 5e-5,
         "batch_size"            : 128,
@@ -121,15 +150,16 @@ def train_dqn(project_name="MediumDeliveryEnv-DQN", run_name=None, total_timeste
     # --- Environment Setup ---------------------------------------------
     def make_env():
         """Helper function to create and wrap the environment."""
-        env = MediumDeliveryEnv(
-            map_config=MAIL_DELIVERY_MAPS[config["map_config"]],
-            render_mode='rgb_array',
-        )
+
+        EnvClass, map_dict = resolve_env()
+        map_data = map_dict[MAP_NAME]
+
+        env = EnvClass(map_config=map_data, render_mode='rgb_array')
         if SEED:
             env.seed=SEED
-        monitor_path = os.path.join(log_dir, f"monitor_{run.id}")
-        env = Monitor(env, filename=monitor_path)
-        return env
+
+        monitor_path = os.path.join(log_dir, f"monitor_{run.id}") 
+        return Monitor(env, filename=monitor_path)
 
     # Create a vectorized environment
     vec_env = DummyVecEnv([make_env])
@@ -213,4 +243,4 @@ def train_dqn(project_name="MediumDeliveryEnv-DQN", run_name=None, total_timeste
         print("Training complete.")
 
 if __name__ == "__main__":
-    train_dqn(run_name="DQN_MediumEnv_EpsilonFix", total_timesteps=5*pow(10,6))
+    train_dqn(run_name=ENV_NAME + "-SB3-DQN", total_timesteps=TOTAL_TIME_STEPS)

@@ -8,16 +8,16 @@ from matplotlib.patches import Rectangle, Circle
 from maps import MAIL_DELIVERY_MAPS
 
 # Environment parameters
-SCALE = 4
+SCALE = 1
 
-MOVE_SIZE = 0.5         # distance covered for forward action
+MOVE_SIZE = 0.5                 # distance covered for forward action
 TURN_SIZE = np.deg2rad(15)      # 15 degrees in radians
 
 NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
-SENSE_RADIUS = 0.45 * SCALE             # radius to check whether pickup-/delivery-point is in range
+SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-point is in range
 
 # Simulation parameters
-MAX_STEPS = 5_000
+MAX_STEPS = 750
 NR_PACKAGES = 1
 
 # Rewards
@@ -75,11 +75,16 @@ class SimpleDeliveryEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.action_names))
 
         # 6. Create (normalized) observation space
-        #   1. agent_x / self.map_size[0]   6. packages_left / self.nr_packages
-        #   2. agent_y / self.map_size[1]   7. depot_x / self.map_size[0]
-        #   3. sin(agent_theta)             8. depot_y / self.map_size[1]
-        #   4. cos(agent_theta)             9. delivery_goal_x / self.map_size[0]
-        #   5. has_package                  10. delivery_goal_y / self.map_size[1]
+        #   1. agent_x / self.map_size[0]
+        #   2. agent_y / self.map_size[1]
+        #   3. sin(agent_theta)
+        #   4. cos(agent_theta)
+        #   5. has_package
+        #   6. packages_left / self.nr_packages
+        #   REMOVED (7. depot_x / self.map_size[0])
+        #   REMOVED (8. depot_y / self.map_size[1])
+        #   REMOVED (9. delivery_x / self.map_size[0])
+        #   REMOVED (10. delivery_y / self.map_size[1])
 
         low  = np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0],  dtype=np.float32)
         high = np.ones(10, dtype=np.float32)
@@ -98,9 +103,6 @@ class SimpleDeliveryEnv(gym.Env):
         self.render_mode = render_mode
         self.fig = None
         self.ax = None
-        
-        # 10. Set one fixed goal
-        # self._sample_goal()
 
     def _load_map(self, map_config: dict):
         """Check whether the provided map_config is a valid map."""
@@ -131,7 +133,7 @@ class SimpleDeliveryEnv(gym.Env):
         delivery = map_config.get("delivery", None)
         # sample random goal if no delivery goal specified
         if delivery is None:
-            self._sample_goal()
+            self._sample_goal() #! We have fixed goal now so this is troubling to use
         else:
             if (not isinstance(delivery, (tuple, list)) or len(delivery) != 2):
                 raise ValueError("map_config['delivery'] must be a 2-tuple (x, y)")

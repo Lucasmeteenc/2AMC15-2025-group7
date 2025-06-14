@@ -23,7 +23,6 @@ MAX_LIDAR_DISTANCE = 2.0                    # max distance for each lidar ray re
 
 # Simulation parameters
 MAX_STEPS = 750
-MAX_BUMPS = 50  
 NR_PACKAGES = 1
 
 # Rewards
@@ -32,7 +31,7 @@ REW_DELIVER     = +300.0        # successful delivery
 
 # Penalties
 REW_STEP        = -0.5          # per time‐step
-REW_OBSTACLE    = -5            # penalty on hitting an obstacle; should never happen
+REW_OBSTACLE    = -5            # penalty on hitting an obstacle
 REW_WALL        = -5            # penalty for going out of bounds
 REW_LIDAR       = -0.1          # penalty for being very close to a wall
 
@@ -84,17 +83,17 @@ class MediumDeliveryEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.action_names))
 
         # 6. Create (normalized) observation space
-        #   1. agent_x / self.map_size[0]   
-        #   2. agent_y / self.map_size[1]   
-        #   3. sin(agent_theta)             
-        #   4. cos(agent_theta)             
-        #   5. has_package                  
-        #   6. packages_left / self.nr_packages 
-        #   7. depot_x / self.map_size[0]                               
-        #   8. depot_y / self.map_size[1]
-        #   9. delivery_x / self.map_size[0]
-        #   10. delivery_y / self.map_size[1]
-        #   11. NUM_REGIONS lidar distances 
+        #   1. agent_x / self.map_size[0]
+        #   2. agent_y / self.map_size[1]
+        #   3. sin(agent_theta)
+        #   4. cos(agent_theta)
+        #   5. has_package
+        #   6. packages_left / self.nr_packages
+        #   REMOVED (7. depot_x / self.map_size[0])
+        #   REMOVED (8. depot_y / self.map_size[1])
+        #   REMOVED (9. delivery_x / self.map_size[0])
+        #   REMOVED (10. delivery_y / self.map_size[1])
+        #   11. NUM_REGIONS lidar distances
 
         low = np.concatenate((
             np.array([0, 0, -1, -1, 0, 0,]),# 0, 0, 0, 0]),
@@ -146,7 +145,7 @@ class MediumDeliveryEnv(gym.Env):
         delivery = map_config.get("delivery", None)
         # sample random goal if no delivery goal specified
         if delivery is None:
-            self._sample_goal()
+            self._sample_goal() #! We have fixed goal now so this is troubling to use
         else:
             if (not isinstance(delivery, (tuple, list)) or len(delivery) != 2):
                 raise ValueError("map_config['delivery'] must be a 2-tuple (x, y)")
@@ -237,7 +236,7 @@ class MediumDeliveryEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _get_obs(self):
-        "Return a (10+NUM_REGIONS)-dimensional observation vector."
+        "Return a (6+NUM_REGIONS)-dimensional observation vector."
 
         # relative vectors to static landmarks
         # vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
