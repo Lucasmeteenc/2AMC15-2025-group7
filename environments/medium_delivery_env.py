@@ -72,7 +72,7 @@ class MediumDeliveryEnv(gym.Env):
         self.W,self.H = self.map_size
 
         # 3. Compute map diagonal for normalization
-        self.dmax = np.hypot(self.W, self.H)
+        # self.dmax = np.hypot(self.W, self.H)
 
         # 4. Episode params
         self.nr_packages = NR_PACKAGES

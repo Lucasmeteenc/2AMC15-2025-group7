@@ -64,7 +64,7 @@ class SimpleDeliveryEnv(gym.Env):
         self.W,self.H = self.map_size
 
         # 3. Compute map diagonal for normalization
-        self.dmax = np.hypot(self.W, self.H)
+        # self.dmax = np.hypot(self.W, self.H)
 
         # 4. Episode params
         self.nr_packages = NR_PACKAGES
@@ -86,8 +86,8 @@ class SimpleDeliveryEnv(gym.Env):
         #   REMOVED (9. delivery_x / self.map_size[0])
         #   REMOVED (10. delivery_y / self.map_size[1])
 
-        low  = np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0],  dtype=np.float32)
-        high = np.ones(10, dtype=np.float32)
+        low  = np.array([0, 0, -1, -1, 0, 0],  dtype=np.float32) # , 0, 0, 0, 0
+        high = np.ones(6, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         # 7. RNG
@@ -231,17 +231,17 @@ class SimpleDeliveryEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _get_obs(self):
-        "Return a 10-dimensional observation vector."
+        "Return a 6-dimensional observation vector."
 
         # relative vectors to static landmarks
-        vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
+        # vec_depot = (self.depot - [self.agent_x, self.agent_y]) / self.dmax
 
         # relative vectors to current goal if package is held
-        if self.has_package:
-            vec_goal = (np.array([self.delivery_goal_x, self.delivery_goal_y]) -
-                        np.array([self.agent_x, self.agent_y])) / self.dmax
-        else:
-            vec_goal = np.zeros(2, dtype=np.float32)
+        # if self.has_package:
+        #     vec_goal = (np.array([self.delivery_goal_x, self.delivery_goal_y]) -
+        #                 np.array([self.agent_x, self.agent_y])) / self.dmax
+        # else:
+        #     vec_goal = np.zeros(2, dtype=np.float32)
 
         return np.array([
             self.agent_x / self.map_size[0],
@@ -250,8 +250,8 @@ class SimpleDeliveryEnv(gym.Env):
             np.cos(self.agent_theta),
             float(self.has_package),
             self.packages_left / self.nr_packages,
-            vec_depot[0], vec_depot[1],
-            vec_goal[0],  vec_goal[1],
+            # vec_depot[0], vec_depot[1],
+            # vec_goal[0],  vec_goal[1],
         ], dtype=np.float32)
 
     # --- Motion Action Checks --------------------------------------
@@ -440,11 +440,30 @@ class SimpleDeliveryEnv(gym.Env):
         self.ax.arrow(self.agent_x, self.agent_y, dx, dy,
                     head_width=0.15, head_length=0.15, fc="blue", ec="blue")
 
-        # 7. Draw package count in top-left
+        # 7a. Draw steps-left in top-left
+        steps_left = self.max_steps - self.steps
+        self.ax.text(
+            0.02 * self.W, 0.98 * self.H,
+            f"Steps left: {steps_left}",
+            color="black",
+            fontsize=8,
+            verticalalignment="top"
+        )
+
+        # 7b. Draw package count in top-left
         pkg_text = "Carrying" if self.has_package else "Empty"
         self.ax.text(0.02 * self.W, 0.94 * self.H,
                     f"{pkg_text}, Left: {self.packages_left}", color="black",
                     fontsize=8, verticalalignment="top")
+        
+        # 7c. Draw current epsilon
+        if hasattr(self, "model") and hasattr(self.model, "exploration_rate"):
+            eps = self.model.exploration_rate
+            self.ax.text(
+                0.02 * self.W, 0.90 * self.H,
+                f"Epsilon: {eps:.2f}",
+                color="black", fontsize=8, verticalalignment="top"
+            )
 
         # 9. Finalize for human or rgb_array
         if self.render_mode == "human":
