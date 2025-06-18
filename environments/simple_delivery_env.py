@@ -21,13 +21,20 @@ MAX_STEPS = 750
 NR_PACKAGES = 1
 
 # Rewards
-REW_PICKUP      = +100.0        # successful pickup
-REW_DELIVER     = +300.0        # successful delivery
+REW_PICKUP      = +10.0        # successful pickup
+REW_DELIVER     = +30.0        # successful delivery
+# REW_PICKUP      = +100.0        # successful pickup
+# REW_DELIVER     = +300.0        # successful delivery
+
 
 # Penalties
-REW_STEP        = -0.5          # per time‐step
-REW_OBSTACLE    = -5            # penalty on hitting an obstacle
-REW_WALL        = -5            # penalty for going out of bounds
+REW_STEP        = -0.05          # per time‐step
+REW_OBSTACLE    = -2          # penalty on hitting an obstacle
+REW_WALL        = -2            # penalty for going out of bounds
+
+# REW_STEP        = -0.5          # per time‐step
+# REW_OBSTACLE    = -5          # penalty on hitting an obstacle
+# REW_WALL        = -5            # penalty for going out of bounds
 
 FPS = 30
 
@@ -86,8 +93,8 @@ class SimpleDeliveryEnv(gym.Env):
         #   REMOVED (9. delivery_x / self.map_size[0])
         #   REMOVED (10. delivery_y / self.map_size[1])
 
-        low  = np.array([0, 0, -1, -1, 0, 0],  dtype=np.float32) # , 0, 0, 0, 0
-        high = np.ones(6, dtype=np.float32)
+        low  = np.array([0, 0, -1, -1, 0, 0, 0],  dtype=np.float32)
+        high = np.ones(7, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         # 7. RNG
@@ -250,6 +257,7 @@ class SimpleDeliveryEnv(gym.Env):
             np.cos(self.agent_theta),
             float(self.has_package),
             self.packages_left / self.nr_packages,
+            float(self.bumped_obstacle or self.hit_wall),
             # vec_depot[0], vec_depot[1],
             # vec_goal[0],  vec_goal[1],
         ], dtype=np.float32)
