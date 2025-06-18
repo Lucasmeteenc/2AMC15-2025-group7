@@ -26,52 +26,56 @@ class AdvantageCalculator:
     """Utility class for calculating advantages and returns."""
 
     @staticmethod
-    def calculate_returns(rewards: torch.Tensor, discount_factor: float, 
-                          final_value: float = 0.0,
-                         normalize: bool = False) -> torch.Tensor:
-        """Calculate discounted returns for rewards."""
-        if len(rewards) == 0:
-            return torch.tensor([])
+    def calculate_returns(
+        rewards: torch.Tensor,          # (T, N)
+        dones:   torch.Tensor,          # (T, N) bool
+        last_values: torch.Tensor,      # (N,)
+        gamma:   float,
+    ) -> torch.Tensor:
+        """
+        Discounted returns without GAE (equivalent to λ = 1).
+        """
+        T, N = rewards.shape
+        device = rewards.device
 
-        returns = torch.zeros_like(rewards)
-        cumulative = final_value
+        returns = torch.zeros((T, N), device=device)
+        running = last_values          # V(s_T)
 
-        for i in reversed(range(len(rewards))):
-            cumulative = rewards[i] + discount_factor * cumulative
-            returns[i] = cumulative
-
-        if normalize and len(returns) > 1:
-            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+        for t in reversed(range(T)):
+            mask = 1.0 - dones[t].float()   # zero after terminal
+            running = rewards[t] + gamma * running * mask
+            returns[t] = running
         return returns
 
     @staticmethod
-    def calculate_gae(rewards: torch.Tensor, values: torch.Tensor,
-                    discount_factor: float, gae_lambda: float, 
-                    final_value: float = 0.0) -> torch.Tensor:
-        if len(rewards) == 0:
-            return torch.tensor([])
+    def calculate_gae(
+        rewards:  torch.Tensor,        # (T, N)
+        values:   torch.Tensor,        # (T, N)
+        dones:    torch.Tensor,        # (T, N)  bool
+        last_values: torch.Tensor,     # (N,)
+        gamma:    float,
+        lam:      float,
+    ):
+        """Returns (advantages, returns) each shaped (T, N)."""
+        T, N = rewards.shape
+        device = rewards.device
 
-        advantages = torch.zeros_like(rewards)
-        gae = 0.0
+        # Append the bootstrap value so we can vectorise index t+1
+        values_ext = torch.cat([values, last_values.unsqueeze(0)], dim=0)  # (T+1, N)
 
-        for i in reversed(range(len(rewards))):
-            if i == len(rewards) - 1:
-                next_value = final_value
-            else:
-                next_value = values[i + 1]
-            
-            delta = rewards[i] + discount_factor * next_value - values[i]
-            gae = delta + discount_factor * gae_lambda * gae
-            advantages[i] = gae
-        
-        return advantages
+        advantages = torch.zeros((T, N), device=device)
+        gae = torch.zeros(N, device=device)
+
+        for t in reversed(range(T)):
+            # If episode ended at step t, mask = 0 → cut trace
+            mask = 1.0 - dones[t].float()
+            delta = rewards[t] + gamma * values_ext[t + 1] * mask - values[t]
+            gae = delta + gamma * lam * gae * mask
+            advantages[t] = gae
+
+        returns = advantages + values                                # V-targets
+        return advantages, returns
     
-    @staticmethod
-    def calculate_simple_advantages(returns: torch.Tensor, 
-                                values: torch.Tensor) -> torch.Tensor:
-        advantages = returns - values
-        return advantages
-
 class ExplorationScheduler:
     """Manages exploration strategy with epsilon-greedy scheduling."""
 

@@ -6,116 +6,67 @@ Contains Actor, Critic networks and NetworkFactory.
 import torch
 import torch.nn as nn
 import numpy as np
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
 
 class NetworkFactory:
     """Factory class for creating neural networks."""
 
     @staticmethod
-    def create_actor(input_size: int, hidden_dims: int, action_dim: int, 
-                    dropout: float, num_layers: int) -> "Actor":
+    def create_actor(input_size: int, action_dim: int) -> "Actor":
         """Create an Actor network."""
-        return Actor(input_size, hidden_dims, action_dim, dropout, num_layers)
+        return Actor(input_size, action_dim)
 
     @staticmethod
-    def create_critic(input_size: int, hidden_dims: int, dropout: float, 
-                     num_layers: int) -> "Critic":
+    def create_critic(input_size: int) -> "Critic":
         """Create a Critic network."""
-        return Critic(input_size, hidden_dims, dropout, num_layers)
+        return Critic(input_size)
 
 
 class Actor(nn.Module):
-    """Actor network for policy approximation in PPO."""
-
-    def __init__(self, input_features: int, hidden_dimensions: int, action_dim: int,
-                 dropout: float, num_layers: int = 3):
+    def __init__(self, input_features: int, action_dim: int):
         super().__init__()
+        self.backbone = nn.Sequential(
+            nn.Linear(input_features, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+        )
+        self.logits_head = nn.Linear(64, action_dim)
 
-        if num_layers < 1:
-            raise ValueError("Number of layers must be at least 1")
+        self._init_weights()
 
-        self.input_features = input_features
-        self.hidden_dimensions = hidden_dimensions
-        self.action_dim = action_dim
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
+                nn.init.constant_(m.bias, 0.)
+        # output layer gets small gain (0.01) so early updates are gentle
+        nn.init.orthogonal_(self.logits_head.weight, gain=0.01)
 
-        # Build dynamic network
-        layers = []
-        input_dim = input_features
-
-        for i in range(num_layers):
-            layers.extend([
-                nn.Linear(input_dim, hidden_dimensions),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-            ])
-            input_dim = hidden_dimensions
-
-        self.backbone = nn.Sequential(*layers)
-        self.action_head = nn.Linear(hidden_dimensions, action_dim)
-        self._initialize_weights()
-
-    def _initialize_weights(self) -> None:
-        """Initialize network weights using orthogonal initialization."""
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.orthogonal_(module.weight, gain=np.sqrt(2))
-                nn.init.constant_(module.bias, 0.0)
-        nn.init.orthogonal_(self.action_head.weight, gain=0.1)
-
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the actor network."""
+    def forward(self, state):
         if state.dim() == 1:
             state = state.unsqueeze(0)
         x = self.backbone(state)
-        action_logits = self.action_head(x)
-        return action_logits
-
+        return self.logits_head(x)               # logits
 
 class Critic(nn.Module):
-    """Critic network for value function approximation in PPO."""
-
-    def __init__(self, input_features: int, hidden_dimensions: int, 
-                 dropout: float, num_layers: int = 3):
+    def __init__(self, input_dim: int):
         super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+        )
+        self.value_head = nn.Linear(64, 1)
 
-        if num_layers < 1:
-            raise ValueError("Number of layers must be at least 1")
-
-        self.input_features = input_features
-        self.hidden_dimensions = hidden_dimensions
-
-        # Build dynamic network
-        layers = []
-        input_dim = input_features
-
-        for i in range(num_layers):
-            layers.extend([
-                nn.Linear(input_dim, hidden_dimensions),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-            ])
-            input_dim = hidden_dimensions
-
-        self.backbone = nn.Sequential(*layers)
-        self.value_head = nn.Linear(hidden_dimensions, 1)
-        self._initialize_weights()
-
-    def _initialize_weights(self) -> None:
-        """Initialize network weights using orthogonal initialization."""
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.orthogonal_(module.weight, gain=np.sqrt(2))
-                nn.init.constant_(module.bias, 0.0)
+        # Orthogonal init as in OpenAI Baselines
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
+                nn.init.constant_(m.bias, 0.0)
         nn.init.orthogonal_(self.value_head.weight, gain=1.0)
 
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the critic network."""
-        if state.dim() == 1:
-            state = state.unsqueeze(0)
-        x = self.backbone(state)
-        value = self.value_head(x)
-        return value
+    def forward(self, x):
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        return self.value_head(self.net(x)).squeeze(-1)

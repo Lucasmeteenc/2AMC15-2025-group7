@@ -15,6 +15,7 @@ import torch.optim as optim
 import torch.distributions as distributions
 from torch.utils.data import DataLoader, TensorDataset
 
+from environments.medium_delivery_env import MediumDeliveryEnv
 from environments.simple_delivery_env import SimpleDeliveryEnv
 from ppo_network import NetworkFactory
 from ppo_utils import (
@@ -25,6 +26,8 @@ from ppo_utils import (
     MetricsLogger,
     PPOError,
 )
+
+import gymnasium as gym
 
 # Configure logging
 logging.basicConfig(
@@ -42,38 +45,51 @@ logger = logging.getLogger(__name__)
 class PPOConfig:
     """Configuration class for PPO training parameters."""
 
-    hidden_dimensions: int = 512
-    num_layers: int = 3
-    dropout: float = 0.0
-    learning_rate: float = 1e-3
-    batch_size: int = 128
-    ppo_steps: int = 3
-    exploration_initial_eps: float = 1.0
-    exploration_final_eps: float = 0.02
-    exploration_fraction: float = 0.6
-    discount_factor: float = 0.99
-    gae_lambda: float = 0.95
-    epsilon: float = 0.1
-    entropy_coefficient: float = 0.01
-    value_coefficient: float = 0.1
-    max_grad_norm: float = 0.1
-    n_episodes: int = 2000
-    learning_starts: int = 100
-    reward_threshold: float = 5000.0
-    max_steps: int = 10000
-    lr_decay: float = 0.995
-    checkpoint_interval: int = 500
+    # Sampler
+    total_timesteps: int = 1_000_000        # stop criterion
+    horizon: int = 2_048                    # T  (steps per env before an update)
+    num_envs: int = 8                       # N  (parallel envs)
+
+    # Architecture
+    hidden_dim: int = 64
+
+    #optimization
+    learning_rate: float = 3e-4             # Adam
+    batch_size: int = 64                    # per SGD minibatch
+    n_epochs: int = 10                      # PPO epochs per update
+
+    clip_range: float = 0.2                 # ε in clipped objective
+    gamma: float = 0.99                     # discount
+    gae_lambda: float = 0.95                # λ for GAE
+    value_coef: float = 0.5                 # c₁
+    entropy_coef: float = 0.0               # c₂
+    max_grad_norm: float = 0.5              # global grad-clip
+
     use_gae: bool = True
+
+    # Rest
+    seed: int = 0
+    log_interval: int = 1                   # updates between train logs
+    eval_interval: int = 10                 # updates between eval roll-outs
+    checkpoint_interval: int = 20           # updates between checkpoints
+    early_stop_window: int = 100
+    reward_threshold: float = 5_000.0
+    log_window: int = 100
+
     log_dir: str = "logs"
     checkpoint_dir: str = "checkpoints"
 
     def __post_init__(self):
-        if self.learning_rate <= 0:
-            raise ValueError("Learning rate must be positive")
-        if self.batch_size <= 0:
-            raise ValueError("Batch size must be positive")
-        if not 0 <= self.dropout <= 1:
-            raise ValueError("Dropout must be between 0 and 1")
+        if self.total_timesteps < 1:
+            raise ValueError("total_timesteps must be positive")
+        if self.horizon < 1:
+            raise ValueError("horizon must be positive")
+        if self.num_envs < 1:
+            raise ValueError("num_envs must be at least 1")
+        if self.batch_size < 1 or self.batch_size > self.horizon * self.num_envs:
+            raise ValueError("batch_size must be in (0, horizon * num_envs]")
+        if not (0.0 < self.learning_rate):
+            raise ValueError("learning_rate must be positive")
 
 
 class PPOAgent:
@@ -86,7 +102,7 @@ class PPOAgent:
         )
 
         # Initialize components
-        self.exploration_scheduler = ExplorationScheduler(config)
+        # self.exploration_scheduler = ExplorationScheduler(config)
         self.checkpoint_manager = CheckpointManager(config.checkpoint_dir)
         self.metrics_logger = MetricsLogger(config.log_dir)
         self.advantage_calculator = AdvantageCalculator()
@@ -107,17 +123,11 @@ class PPOAgent:
             # Create networks
             self.actor = NetworkFactory.create_actor(
                 state_size,
-                self.config.hidden_dimensions,
                 action_size,
-                self.config.dropout,
-                self.config.num_layers,
             ).to(self.device)
 
             self.critic = NetworkFactory.create_critic(
                 state_size,
-                self.config.hidden_dimensions,
-                self.config.dropout,
-                self.config.num_layers,
             ).to(self.device)
 
             # Create optimizers
@@ -129,12 +139,12 @@ class PPOAgent:
             )
 
             # Create schedulers
-            self.actor_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                self.actor_optimizer, T_max=self.config.n_episodes, eta_min=1e-6
-            )
-            self.critic_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                self.critic_optimizer, T_max=self.config.n_episodes, eta_min=1e-6
-            )
+            # self.actor_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            #     self.actor_optimizer, T_max=self.config.n_episodes, eta_min=1e-6
+            # )
+            # self.critic_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            #     self.critic_optimizer, T_max=self.config.n_episodes, eta_min=1e-6
+            # )
 
             # Log network information
             actor_params = sum(
@@ -152,421 +162,320 @@ class PPOAgent:
             logger.error(f"Failed to setup networks: {e}")
             raise PPOError(f"Network setup failed: {e}")
 
-    def collect_experience(self, env, episode: int):
-        """Collect experience from environment interaction."""
-        if self.actor is None or self.critic is None:
-            raise PPOError("Networks not initialized. Call setup_networks first.")
+    def collect_rollout(self, envs, obs):
+        """
+        Collect `self.horizon` steps from `n_envs` vectorised environments.
+        Returns a dict ready for GAE and PPO updates.
+        """
+        storage = []
 
-        states, actions, log_probs, values, rewards = [], [], [], [], []
-        episode_reward = 0.0
+        for _ in range(self.config.horizon):
+            # 1. Forward pass
+            logits = self.actor(obs)
+            dist   = torch.distributions.Categorical(logits=logits)
+            actions = dist.sample()                               # (N,)
 
-        try:
-            state, _ = env.reset()
-            self.actor.eval()
-            self.critic.eval()
-
-            with torch.no_grad():
-                done = False
-                for step in range(self.config.max_steps):
-                    state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-
-                    # --- 1. Forward pass -------------------------------------------------
-                    action_logits = self.actor(state_tensor)
-                    action_probs = F.softmax(action_logits, dim=-1)
-                    dist = distributions.Categorical(action_probs)
-                    value = self.critic(state_tensor)
-
-                    # --- 2. ε-greedy exploration ----------------------------------------
-                    eps = 0
-                    if np.random.rand() < eps:
-                        weights = self.exploration_scheduler.get_exploration_weights(
-                            state, env, episode
-                        )
-                        a = np.random.choice(len(weights), p=weights)
-                        log_p = torch.clamp(
-                            torch.log(
-                                torch.tensor(weights[a] + 1e-8, device=self.device)
-                            ),
-                            min=-10,
-                            max=2,
-                        ).unsqueeze(0)
-                    else:
-                        a = dist.sample().item()
-                        log_p = dist.log_prob(
-                            torch.tensor(a, device=self.device)
-                        ).unsqueeze(0)
-
-                    next_state, reward, terminated, truncated, _ = env.step(a)
-                    done = terminated or truncated
-
-                    # store transition
-                    states.append(state_tensor.squeeze(0))
-                    actions.append(torch.tensor([a], device=self.device))
-                    log_probs.append(log_p.squeeze() if log_p.dim() > 0 else log_p)
-                    values.append(value.squeeze())
-                    rewards.append(reward)
-                    episode_reward += reward
-                    state = next_state
-
-                    if done:
-                        break
-
-                # Bootstrap value for truncated episodes
-                if not done:
-                    final_state_tensor = (
-                        torch.FloatTensor(state).unsqueeze(0).to(self.device)
-                    )
-                    final_value = self.critic(final_state_tensor).squeeze().item()
-                else:
-                    final_value = 0.0
-
-            # Convert to tensors
-            states = torch.stack(states).to(self.device)
-            actions = torch.stack(actions).to(self.device)
-            log_probs = torch.stack(log_probs).to(self.device)
-            values = torch.stack(values).to(self.device)
-            rewards = torch.FloatTensor(rewards).to(self.device)
-            return (
-                episode_reward,
-                states,
-                actions,
-                log_probs,
-                values,
-                rewards,
-                final_value,
+            next_obs_np, rewards_np, term_np, trunc_np, _ = envs.step(
+                actions.cpu().numpy()
             )
+            done_np = np.logical_or(term_np, trunc_np)           # (N,)
 
-        except Exception as e:
-            logger.error(f"Error during experience collection: {e}")
-            raise PPOError(f"Experience collection failed: {e}")
+            # 2. Step environments
+            next_obs = torch.from_numpy(next_obs_np).to(self.device)
+            rewards  = torch.from_numpy(rewards_np).to(self.device)
+            dones    = torch.from_numpy(done_np.astype(np.uint8)).to(self.device)
+
+            storage.append({
+                "obs":    obs,
+                "act":    actions,
+                "logp":   dist.log_prob(actions),
+                "value":  self.critic(obs).squeeze(-1),
+                "reward": rewards,
+                "done":   dones,
+            })
+
+            # 3. Reset envs that ended and continue
+            obs = next_obs
+
+        last_values = self.critic(obs).squeeze(-1)                # (N,)
+        return storage, last_values, obs
 
     def update_policy(
-        self,
-        states: torch.Tensor,
-        actions: torch.Tensor,
-        log_probs_old: torch.Tensor,
-        advantages: torch.Tensor,
-        returns: torch.Tensor,
+            self,
+            states: torch.Tensor,          # (B, obs_dim)
+            actions: torch.Tensor,         # (B,)
+            logp_old: torch.Tensor,        # (B,)
+            advantages: torch.Tensor,      # (B,)
+            returns: torch.Tensor,         # (B,)
     ) -> Tuple[float, float, float]:
-        """Update policy using PPO algorithm."""
-        if None in [
-            self.actor,
-            self.critic,
-            self.actor_optimizer,
-            self.critic_optimizer,
-        ]:
+        """
+        One PPO update consisting of `self.config.n_epochs` epochs of SGD
+        on minibatches of size `self.config.batch_size`.
+        Expects *flattened* rollout tensors (B = T × N).
+        """
+        if any(x is None for x in (self.actor, self.critic,
+                                self.actor_optimizer, self.critic_optimizer)):
             raise PPOError("Networks or optimizers not initialized")
 
-        total_policy_loss = 0
-        total_value_loss = 0
-        total_entropy = 0
+        # Advantage normalisation (recommended in PPO paper appendix)
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        try:
-            # Detach old values to prevent gradients
-            log_probs_old = log_probs_old.detach()
-            advantages = advantages.detach()
-            returns = returns.detach()
+        dataset = TensorDataset(states, actions, logp_old, advantages, returns)
+        loader  = DataLoader(dataset,
+                            batch_size=self.config.batch_size,
+                            shuffle=True,
+                            drop_last=True)
 
-            # Create dataset and dataloader
-            dataset = TensorDataset(states, actions, log_probs_old, advantages, returns)
-            dataloader = DataLoader(
-                dataset, batch_size=self.config.batch_size, shuffle=True
-            )
+        self.actor.train()
+        self.critic.train()
 
-            self.actor.train()
-            self.critic.train()
+        tot_pi_loss = tot_v_loss = tot_entropy = 0.0
+        n_minibatch = self.config.n_epochs * len(loader)
+        clip_eps = self.config.clip_range
 
-            for _ in range(self.config.ppo_steps):
-                for batch_data in dataloader:
-                    (
-                        states_batch,
-                        actions_batch,
-                        log_probs_old_batch,
-                        advantages_batch,
-                        returns_batch,
-                    ) = batch_data
+        for _ in range(self.config.n_epochs):
+            for s_b, a_b, logp_old_b, adv_b, ret_b in loader:
 
-                    # Forward pass through both networks
-                    action_logits = self.actor(states_batch)
-                    values = self.critic(states_batch).squeeze(-1)
-                    values = torch.clamp(values, -100, 100)
+                # detach minibatch views
+                s_b       = s_b.detach()
+                a_b       = a_b.detach()
+                logp_old_b = logp_old_b.detach()
+                adv_b     = adv_b.detach()
+                ret_b     = ret_b.detach()
 
-                    # Calculate new log probabilities
-                    action_probs = F.softmax(action_logits, dim=-1)
-                    action_probs = torch.clamp(action_probs, min=1e-8, max=1.0)
-                    dist = distributions.Categorical(action_probs)
-                    log_probs_new = dist.log_prob(actions_batch)
-                    log_probs_new = torch.clamp(log_probs_new, min=-10, max=2)
-                    log_probs_old_batch = torch.clamp(
-                        log_probs_old_batch, min=-10, max=2
-                    )
+                # forwardpass actor
+                logits = self.actor(s_b)
+                dist   = torch.distributions.Categorical(logits=logits)
+                logp   = dist.log_prob(a_b)
+                entropy = dist.entropy().mean()
 
-                    # Calculate losses
-                    policy_loss = PPOLoss.calculate_policy_loss(
-                        log_probs_old_batch,
-                        log_probs_new,
-                        returns_batch,
-                        self.config.epsilon,
-                    )
+                ratio   = torch.exp(logp - logp_old_b)
+                surr1   = ratio * adv_b
+                surr2   = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv_b
+                policy_loss = -torch.min(surr1, surr2).mean()
 
-                    value_loss = F.mse_loss(values, returns_batch.clamp(-50, 50))
-                    entropy = dist.entropy().mean()
-                    entropy_loss = -self.config.entropy_coefficient * entropy
+                self.actor_optimizer.zero_grad()
+                actor_loss = policy_loss - self.config.entropy_coef * entropy
+                actor_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.actor.parameters(),
+                                            self.config.max_grad_norm)
+                self.actor_optimizer.step()
 
-                    # Update actor
-                    actor_loss = policy_loss + entropy_loss
-                    self.actor_optimizer.zero_grad()
-                    actor_loss.backward()
+                # Forwardpass Critic
+                values = self.critic(s_b).squeeze(-1)
+                value_loss = F.mse_loss(values, ret_b)
 
-                    total_norm = 0
-                    for p in self.actor.parameters():
-                        if p.grad is not None:
-                            total_norm += p.grad.data.norm(2).item() ** 2
-                    total_norm = total_norm ** 0.5
-
-                    torch.nn.utils.clip_grad_norm_(
-                        self.actor.parameters(), self.config.max_grad_norm
-                    )
-                    self.actor_optimizer.step()
-
-                    # Update critic
-                    critic_loss = self.config.value_coefficient * value_loss
-                    self.critic_optimizer.zero_grad()
-                    critic_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(
-                        self.critic.parameters(), self.config.max_grad_norm
-                    )
-                    self.critic_optimizer.step()
-
-                    # print(f"log_probs_old: {log_probs_old_batch[:5]}")
-                    # print(f"log_probs_new: {log_probs_new[:5]}")
-                    # print(f"advantages: {advantages_batch[:5]}")
-                    # print(f"ratio: {torch.exp(log_probs_new[:5] - log_probs_old_batch[:5])}")
-
-                    # Track losses
-                    total_policy_loss += policy_loss.item()
-                    total_value_loss += value_loss.item()
-                    total_entropy += entropy.item()
-                    print(f"Action logits range: [{action_logits.min():.3f}, {action_logits.max():.3f}]")
-
-            # Calculate average losses
-            num_updates = self.config.ppo_steps * len(dataloader)
-            avg_policy_loss = total_policy_loss / num_updates
-            avg_value_loss = total_value_loss / num_updates
-            avg_entropy = total_entropy / num_updates
-
-            return avg_policy_loss, avg_value_loss, avg_entropy
-
-        except Exception as e:
-            logger.error(f"Error during policy update: {e}")
-            raise PPOError(f"Policy update failed: {e}")
-
-    def evaluate(self, env) -> float:
-        """Evaluate the current policy."""
-        if self.actor is None or self.critic is None:
-            raise PPOError("Networks not initialized")
-
-        self.actor.eval()
-        self.critic.eval()
-        episode_reward = 0
-        state, _ = env.reset()
-
-        with torch.no_grad():
-            for step in range(self.config.max_steps):
-                state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-                action_logits = self.actor(state_tensor)
-                action_probs = F.softmax(action_logits, dim=-1)
-                action = torch.argmax(action_probs, dim=-1)
-
-                next_state, reward, terminated, truncated, _ = env.step(action.item())
-                done = terminated or truncated
-                episode_reward += reward
-                state = next_state
-
-                if done:
-                    break
-
-        return episode_reward
-
-    def train(self, train_env, eval_env):
-        """Main training loop."""
-        train_rewards = []
-        policy_losses = []
-        value_losses = []
-        entropies = []
-
-        logger.info(f"Starting PPO training for {self.config.n_episodes} episodes")
-
-        try:
-            for episode in range(1, self.config.n_episodes + 1):
-                # Collect experience
-                (
-                    episode_reward,
-                    states,
-                    actions,
-                    log_probs,
-                    values,
-                    rewards,
-                    final_value,
-                ) = self.collect_experience(train_env, episode)
-
-                # Calculate returns and advantages
-                returns = self.advantage_calculator.calculate_returns(
-                    rewards, self.config.discount_factor, final_value
-                )
-
-                if self.config.use_gae:
-                    advantages = self.advantage_calculator.calculate_gae(
-                        rewards,
-                        values,
-                        self.config.discount_factor,
-                        self.config.gae_lambda,
-                        final_value,
-                    )
-                else:
-                    advantages = self.advantage_calculator.calculate_simple_advantages(
-                        returns, values
-                    )
-
-                # Update policy
-                avg_policy_loss, avg_value_loss, avg_entropy = self.update_policy(
-                    states, actions, log_probs, advantages, returns
-                )
-
-                # Step learning rate schedulers
-                if self.actor_scheduler and self.critic_scheduler:
-                    self.actor_scheduler.step()
-                    self.critic_scheduler.step()
-
-                # Track metrics
-                train_rewards.append(episode_reward)
-                policy_losses.append(avg_policy_loss)
-                value_losses.append(avg_value_loss)
-                entropies.append(avg_entropy)
+                self.critic_optimizer.zero_grad()
+                (self.config.value_coef * value_loss).backward()
+                torch.nn.utils.clip_grad_norm_(self.critic.parameters(),
+                                            self.config.max_grad_norm)
+                self.critic_optimizer.step()
 
                 # Logging
-                if episode % 100 == 0:
-                    avg_reward = np.mean(train_rewards[-50:])
-                    current_actor_lr = (
-                        self.actor_scheduler.get_last_lr()[0]
-                        if self.actor_scheduler
-                        else self.config.learning_rate
-                    )
-                    current_critic_lr = (
-                        self.critic_scheduler.get_last_lr()[0]
-                        if self.critic_scheduler
-                        else self.config.learning_rate
-                    )
+                tot_pi_loss  += policy_loss.item()
+                tot_v_loss   += value_loss.item()
+                tot_entropy += entropy.item()
 
-                    logger.info(
-                        f"Ep: {episode:4d} | Avg Reward: {avg_reward:.2f} | "
-                        f"Policy Loss: {avg_policy_loss:.4f} | Value Loss: {avg_value_loss:.4f} | "
-                        f"Entropy: {avg_entropy:.4f} | Actor LR: {current_actor_lr:.6f} | "
-                        f"Critic LR: {current_critic_lr:.6f}"
-                    )
 
-                    self.metrics_logger.log_training_metrics(
-                        episode,
-                        avg_reward,
-                        avg_policy_loss,
-                        avg_value_loss,
-                        avg_entropy,
-                        current_actor_lr,
-                        current_critic_lr,
-                    )
+        return (tot_pi_loss / n_minibatch,
+                tot_v_loss  / n_minibatch,
+                tot_entropy / n_minibatch)
 
-                # Evaluation
-                if episode % 500 == 0:
-                    eval_reward = self.evaluate(eval_env)
-                    logger.info(f"Evaluation Reward: {eval_reward:.2f}")
-                    self.metrics_logger.log_evaluation_metrics(episode, eval_reward)
 
-                # Checkpointing
-                if episode % self.config.checkpoint_interval == 0:
-                    checkpoint_path = f"checkpoint_ep{episode}.pt"
-                    self.checkpoint_manager.save_checkpoint(
-                        self.actor,
-                        self.critic,
-                        self.actor_optimizer,
-                        self.critic_optimizer,
-                        episode,
-                        train_rewards,
-                        self.config,
-                        checkpoint_path,
-                    )
+    @torch.no_grad()
+    def evaluate(self, env, render: bool = False) -> float:
+        """
+        Run *one* evaluation episode with the current greedy policy.
+        """
+        obs_np, _ = env.reset(seed=self.config.seed + 123)
+        obs = torch.from_numpy(obs_np).float().to(self.device)
 
-                # Early stopping
-                if (
-                    len(train_rewards) >= 100
-                    and np.mean(train_rewards[-100:]) >= self.config.reward_threshold
-                ):
-                    logger.info(
-                        f"Reached reward threshold! Training stopped at episode {episode}"
-                    )
-                    break
+        episode_return = 0.0
+        done = False
+        while not done:
+            logits = self.actor(obs)
+            action = torch.argmax(logits, dim=-1).item()     # greedy
+            next_obs_np, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
 
-            # Save final model
-            self.checkpoint_manager.save_checkpoint(
-                self.actor,
-                self.critic,
-                self.actor_optimizer,
-                self.critic_optimizer,
-                episode,
-                train_rewards,
-                self.config,
-                "final_model.pt",
+            episode_return += reward
+            obs = torch.from_numpy(next_obs_np).float().to(self.device)
+
+            if render:
+                env.render()
+
+        return episode_return
+
+    def train(self, train_envs, eval_env):
+        """
+        Main PPO training loop (vectorised environments, fixed-horizon roll-outs).
+        - envs : vectorised training environments (n_envs)
+        - eval_env : single env for evaluation
+        """
+        horizon     = self.config.horizon         # e.g. 2048
+        n_envs      = self.config.num_envs          # e.g. 8
+        total_steps = self.config.total_timesteps # e.g. 1e6
+        n_updates   = total_steps // (horizon * n_envs)
+
+        # --- logging buffers --------------------------------------------------
+        running_return = np.zeros(self.config.num_envs, dtype=np.float32)
+        completed_returns: list[float] = []
+
+        obs, _ = train_envs.reset()
+        obs = torch.from_numpy(obs).to(self.device)
+
+        for update in range(1, n_updates + 1):
+
+            # 1. Roll-out ------------------------------------------------------
+            storage, last_values, obs = self.collect_rollout(train_envs, obs)
+
+            # unpack into T × n_envs tensors
+            rewards = torch.stack([b["reward"] for b in storage])   # (T, n_envs)
+            dones   = torch.stack([b["done"]   for b in storage])   # (T, n_envs)
+            values  = torch.stack([b["value"]  for b in storage])   # (T, n_envs)
+            logp    = torch.stack([b["logp"]   for b in storage])
+            actions = torch.stack([b["act"]    for b in storage])
+            states  = torch.stack([b["obs"]    for b in storage])
+
+            # 2. Advantage / return calculation -------------------------------
+            if self.config.use_gae:
+                advantages, returns = self.advantage_calculator.calculate_gae(
+                    rewards, values, dones, last_values,
+                    gamma=self.config.gamma,
+                    lam=self.config.gae_lambda,
+                )
+            else:
+                returns = self.advantage_calculator.calculate_returns(
+                    rewards, dones, last_values, gamma=self.config.gamma,
+                )
+                advantages = returns - values
+
+            # flatten to (T*n_envs, …) for minibatching
+            def flatten_time_env(tensor: torch.Tensor) -> torch.Tensor:
+                """
+                Collapse (time, env) into one batch dimension.
+                Keeps any extra feature dimensions intact.
+                """
+                return tensor.reshape(-1, *tensor.shape[2:])
+            
+            states_f   = flatten_time_env(states)
+            actions_f  = flatten_time_env(actions)
+            logp_f     = flatten_time_env(logp)
+            returns_f  = flatten_time_env(returns)
+            adv_f      = flatten_time_env(advantages)
+
+            # 3. PPO policy & value update ------------------------------------
+            pi_loss, v_loss, entropy = self.update_policy(
+            states_f, actions_f, logp_f, adv_f, returns_f
             )
 
-            return train_rewards
+            # 4. LR schedulers -------------------------------------------------
+            if self.actor_scheduler:  
+                self.actor_scheduler.step()
+            if self.critic_scheduler: 
+                self.critic_scheduler.step()
 
-        except Exception as e:
-            logger.error(f"Training failed: {e}")
-            raise PPOError(f"Training loop failed: {e}")
+            # 5. Episode-level reward bookkeeping -----------------------------
+            # accumulate rewards per env and extract completed returns
+            rew_np   = rewards.cpu().numpy()
+            done_np  = dones.cpu().numpy()
+            for env_i in range(self.config.num_envs):
+                for r, d in zip(rew_np[:, env_i], done_np[:, env_i]):
+                    running_return[env_i] += r
+                    if d:
+                        completed_returns.append(float(running_return[env_i]))
+                        running_return[env_i] = 0.0
+
+            # 6. Logging -------------------------------------------------------
+            if update % self.config.log_interval == 0:
+                recent = completed_returns[-self.config.log_window:]
+                avg_ret = np.mean(recent) if recent else 0.0
+                logger.info(f"Upd {update:4d}/{n_updates} | "
+                            f"AvgEpRet {avg_ret:8.3f} | "
+                            f"PiLoss {pi_loss:8.4f} | "
+                            f"VLoss {v_loss:8.4f} | "
+                            f"Entropy {entropy:6.3f}")
+                self.metrics_logger.log_training_metrics(
+                    update, avg_ret, pi_loss, v_loss, entropy,
+                    self.actor_optimizer.param_groups[0]['lr'],
+                    self.critic_optimizer.param_groups[0]['lr'],
+                )
+
+            # 7. Evaluation ----------------------------------------------------
+            if update % self.config.eval_interval == 0:
+                eval_ret = self.evaluate(eval_env)
+                self.metrics_logger.log_evaluation_metrics(update, eval_ret)
+
+            # 8. Checkpoint ----------------------------------------------------
+            if update % self.config.checkpoint_interval == 0:
+                self.checkpoint_manager.save_checkpoint(
+                    self.actor, self.critic,
+                    self.actor_optimizer, self.critic_optimizer,
+                    update, completed_returns, self.config,
+                    f"ckpt_update{update}.pt",
+                )
+
+            # 9. Early-stopping -----------------------------------------------
+            if (len(completed_returns) >= self.config.early_stop_window and
+                    np.mean(completed_returns[-self.config.early_stop_window:]) 
+                    >= self.config.reward_threshold):
+                logger.info(f"Solved! Stopping at update {update}")
+                break
+
+        # --- final save -------------------------------------------------------
+        self.checkpoint_manager.save_checkpoint(
+            self.actor, self.critic,
+            self.actor_optimizer, self.critic_optimizer,
+            update, completed_returns, self.config,
+            "final_model.pt",
+        )
+        return completed_returns
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create argument parser with PPOConfig defaults."""
-    parser = argparse.ArgumentParser(description="PPO Training Configuration")
+    p = argparse.ArgumentParser(description="PPO Training Configuration")
 
-    # Get default config for reference
-    default_config = PPOConfig()
+    # Get default config
+    default = PPOConfig()
 
-    # Network architecture
-    parser.add_argument(
-        "--hidden_dimensions", type=int, default=default_config.hidden_dimensions
-    )
-    parser.add_argument("--num_layers", type=int, default=default_config.num_layers)
-    parser.add_argument("--dropout", type=float, default=default_config.dropout)
+    #sampler
+    p.add_argument("--num-envs", type=int, default=default.num_envs,
+                   help="Number of parallel environments (N).")
+    p.add_argument("--horizon", type=int, default=default.horizon,
+                   help="Roll-out length per env before each optimisation phase (T).")
+    p.add_argument("--total-timesteps", type=int, default=default.total_timesteps,
+                   help="Stop training after this many environment steps.")
 
-    # Learning parameters
-    parser.add_argument(
-        "--learning_rate", type=float, default=default_config.learning_rate
-    )
-    parser.add_argument("--batch_size", type=int, default=default_config.batch_size)
-    parser.add_argument("--n_episodes", type=int, default=default_config.n_episodes)
-    parser.add_argument("--ppo_steps", type=int, default=default_config.ppo_steps)
+    # network 
+    p.add_argument("--hidden-dim", type=int, default=default.hidden_dim,
+                   help="Width of each of the two fully-connected layers.")
 
-    # PPO parameters
-    parser.add_argument(
-        "--discount_factor", type=float, default=default_config.discount_factor
-    )
-    parser.add_argument("--epsilon", type=float, default=default_config.epsilon)
-    parser.add_argument(
-        "--use_gae", action="store_true", default=default_config.use_gae
-    )
+    #  optimisation 
+    p.add_argument("--learning-rate", type=float, default=default.learning_rate)
+    p.add_argument("--batch-size",   type=int,   default=default.batch_size,
+                   help="Minibatch size for SGD inside each PPO update.")
+    p.add_argument("--n-epochs",     type=int,   default=default.n_epochs,
+                   help="Number of gradient passes per PPO update.")
+    p.add_argument("--clip-range",   type=float, default=default.clip_range,
+                   help="ε in the PPO clipped objective.")
+    p.add_argument("--gamma",        type=float, default=default.gamma)
+    p.add_argument("--gae-lambda",   type=float, default=default.gae_lambda)
+    p.add_argument("--value-coef",   type=float, default=default.value_coef)
+    p.add_argument("--entropy-coef", type=float, default=default.entropy_coef)
+    p.add_argument("--max-grad-norm", type=float, default=default.max_grad_norm)
 
-    # Directories
-    parser.add_argument("--log_dir", type=str, default=default_config.log_dir)
-    parser.add_argument(
-        "--checkpoint_dir", type=str, default=default_config.checkpoint_dir
-    )
+    # misc
+    p.add_argument("--seed", type=int, default=default.seed)
+    p.add_argument("--log-interval",        type=int, default=default.log_interval)
+    p.add_argument("--eval-interval",       type=int, default=default.eval_interval)
+    p.add_argument("--checkpoint-interval", type=int, default=default.checkpoint_interval)
+    p.add_argument("--log-dir",       type=str, default=default.log_dir)
+    p.add_argument("--checkpoint-dir",type=str, default=default.checkpoint_dir)
+    # p.add_argument("--resume-from",   type=str, default=None,
+    #                help="Path to a saved checkpoint to resume training.")
 
-    # Additional
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--resume_from", type=str, default=None)
-
-    return parser
-
+    return p
 
 def set_random_seeds(seed: int) -> None:
     """Set random seeds for reproducibility."""
@@ -580,44 +489,72 @@ def set_random_seeds(seed: int) -> None:
 def create_environment(render_mode: Optional[str] = None):
     """Create and validate environment."""
     try:
-        env = SimpleDeliveryEnv(render_mode=render_mode)
+        env = MediumDeliveryEnv(render_mode=render_mode)
         return env
     except Exception as e:
         logger.error(f"Failed to create environment: {e}")
         raise PPOError(f"Environment creation failed: {e}")
 
 
-def main():
-    """Main training function."""
+def main() -> None:
+    """
+    Launch PPO training with vectorised training envs
+    and a single (renderable) evaluation env.
+    """
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    config = PPOConfig()
+    config = PPOConfig(**vars(args))
     set_random_seeds(args.seed)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # Create environments
-    train_env = create_environment(render_mode=None)
+    # ------------------------------------------------------------
+    # 1. Vectorised training environments
+    # ------------------------------------------------------------
+    def make_single_env(seed_offset: int):
+        """
+        Return a thunk that creates ONE environment instance.
+        Gymnasium-style, so we can feed it to SyncVectorEnv/SubprocVectorEnv.
+        """
+        def _thunk():
+            env = create_environment(render_mode=None)
+            # env.seed(args.seed + seed_offset)
+            return env
+        return _thunk
+
+    env_fns = [make_single_env(i) for i in range(args.num_envs)]
+    if args.num_envs == 1:
+        train_envs = gym.vector.SyncVectorEnv(env_fns)
+    else:
+        # subprocess version scales better for ≥2 envs with CPU-bound sims
+        train_envs = gym.vector.AsyncVectorEnv(env_fns)
+
+    # 2. Single evaluation env (human render optional)
     eval_env = create_environment(render_mode="human")
 
-    # Get environment dimensions
-    state_space_size = train_env.observation_space.shape[0]
-    action_space_size = train_env.action_space.n
+    # 3. Dimensionality from ONE env instance (they're identical)
+    state_space_size  = train_envs.single_observation_space.shape[0]
+    action_space_size = train_envs.single_action_space.n
 
-    # Create and setup PPO agent
+    # ------------------------------------------------------------
+    # 4. PPO Agent
+    # ------------------------------------------------------------
     agent = PPOAgent(config, device)
     agent.setup_networks(state_space_size, action_space_size)
 
-    # Start training
-    train_rewards = agent.train(train_env, eval_env)
+    # ------------------------------------------------------------
+    # 5. Training loop
+    # ------------------------------------------------------------
+    train_returns = agent.train(train_envs, eval_env)
 
     logger.info("Training completed successfully!")
-    logger.info(f"Final average reward: {np.mean(train_rewards[-100:]):.2f}")
+    if train_returns:
+        logger.info(f"Final 100-episode avg return: {np.mean(train_returns[-100:]):.2f}")
 
-    train_env.close()
+    train_envs.close()
     eval_env.close()
+
 
 
 if __name__ == "__main__":
