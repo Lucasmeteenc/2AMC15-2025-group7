@@ -1,0 +1,248 @@
+"""
+Utility classes for PPO implementation.
+Contains advantage calculation, exploration, loss calculation, checkpointing, and logging.
+"""
+
+import csv
+import logging
+import os
+from pathlib import Path
+from typing import List, Optional
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+logger = logging.getLogger(__name__)
+
+
+class PPOError(Exception):
+    """Custom exception for PPO-related errors."""
+    pass
+
+
+class AdvantageCalculator:
+    """Utility class for calculating advantages and returns."""
+
+    @staticmethod
+    def calculate_returns(rewards: torch.Tensor, discount_factor: float, 
+                          final_value: float = 0.0,
+                         normalize: bool = False) -> torch.Tensor:
+        """Calculate discounted returns for rewards."""
+        if len(rewards) == 0:
+            return torch.tensor([])
+
+        returns = torch.zeros_like(rewards)
+        cumulative = final_value
+
+        for i in reversed(range(len(rewards))):
+            cumulative = rewards[i] + discount_factor * cumulative
+            returns[i] = cumulative
+
+        if normalize and len(returns) > 1:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+        return returns
+
+    @staticmethod
+    def calculate_gae(rewards: torch.Tensor, values: torch.Tensor,
+                    discount_factor: float, gae_lambda: float, 
+                    final_value: float = 0.0) -> torch.Tensor:
+        if len(rewards) == 0:
+            return torch.tensor([])
+
+        advantages = torch.zeros_like(rewards)
+        gae = 0.0
+
+        for i in reversed(range(len(rewards))):
+            if i == len(rewards) - 1:
+                next_value = final_value
+            else:
+                next_value = values[i + 1]
+            
+            delta = rewards[i] + discount_factor * next_value - values[i]
+            gae = delta + discount_factor * gae_lambda * gae
+            advantages[i] = gae
+        
+        return advantages
+    
+    @staticmethod
+    def calculate_simple_advantages(returns: torch.Tensor, 
+                                values: torch.Tensor) -> torch.Tensor:
+        advantages = returns - values
+        return advantages
+
+class ExplorationScheduler:
+    """Manages exploration strategy with epsilon-greedy scheduling."""
+
+    def __init__(self, config):
+        self.initial_eps = config.exploration_initial_eps
+        self.final_eps = config.exploration_final_eps
+        self.exploration_fraction = config.exploration_fraction
+        self.total_episodes = config.n_episodes
+
+    def get_epsilon(self, episode: int) -> float:
+        """Get epsilon value for current episode."""
+        exploration_episodes = int(self.exploration_fraction * self.total_episodes)
+
+        if episode < exploration_episodes:
+            epsilon_progress = episode / exploration_episodes
+            return (self.initial_eps * (1 - epsilon_progress) + 
+                   self.final_eps * epsilon_progress)
+        else:
+            return self.final_eps
+
+    def get_exploration_weights(self, state: np.ndarray, env, episode: int) -> List[float]:
+        if len(state) < 2:
+            return [0.33, 0.33, 0.34]
+
+        # Stronger forward bias early in training
+        base_forward_weight = 0.95
+        decay_factor = max(0.5, 1.0 - episode / 2000)  # Slower decay
+        adjusted_forward_weight = base_forward_weight * decay_factor + (1 - decay_factor) * (1 / 3)
+
+        # Only reduce forward weight if currently near boundaries
+        norm_x, norm_y = state[0], state[1]
+        near_boundary = norm_x < 0.1 or norm_x > 0.9 or norm_y < 0.1 or norm_y > 0.9
+
+        if near_boundary:
+            return [0.4, 0.3, 0.3]
+        else:
+            return [adjusted_forward_weight, (1 - adjusted_forward_weight) / 2,
+                (1 - adjusted_forward_weight) / 2]
+        
+class PPOLoss:
+    """PPO loss calculation utilities."""
+
+    @staticmethod
+    def calculate_policy_loss(log_probs_old: torch.Tensor, log_probs_new: torch.Tensor,
+                            advantages: torch.Tensor, epsilon: float) -> torch.Tensor:
+        """Calculate the clipped PPO policy loss."""
+        try:
+            # Calculate probability ratio
+            ratio = torch.exp(log_probs_new - log_probs_old)
+
+            # Clipped objective
+            clipped_ratio = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
+
+            # Take minimum of clipped and unclipped objective
+            surrogate_loss = torch.min(ratio * advantages, clipped_ratio * advantages)
+            # print(f"surrogate_loss before mean: {surrogate_loss[:5]}")
+            # print(f"final loss: {-surrogate_loss.mean()}")
+
+            return -surrogate_loss.mean()
+        except Exception as e:
+            logger.error(f"Error calculating PPO loss: {e}")
+            raise PPOError(f"PPO loss calculation failed: {e}")
+
+
+class CheckpointManager:
+    """Manages model checkpoints and state persistence."""
+
+    def __init__(self, checkpoint_dir: str):
+        self.checkpoint_dir = Path(checkpoint_dir)
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_checkpoint(self, actor: nn.Module, critic: nn.Module,
+                       actor_optimizer: optim.Optimizer, critic_optimizer: optim.Optimizer,
+                       episode: int, rewards: List[float], config,
+                       filepath: Optional[str] = None) -> str:
+        """Save model checkpoint."""
+        if filepath is None:
+            filepath = self.checkpoint_dir / f"checkpoint_ep{episode}.pt"
+
+        try:
+            checkpoint_data = {
+                "episode": episode,
+                "actor_state_dict": actor.state_dict(),
+                "critic_state_dict": critic.state_dict(),
+                "actor_optimizer_state_dict": actor_optimizer.state_dict(),
+                "critic_optimizer_state_dict": critic_optimizer.state_dict(),
+                "rewards": rewards,
+                "config": config,
+                "pytorch_version": torch.__version__,
+            }
+
+            torch.save(checkpoint_data, filepath)
+            logger.info(f"Checkpoint saved: {filepath}")
+            return str(filepath)
+
+        except Exception as e:
+            logger.error(f"Failed to save checkpoint: {e}")
+            raise PPOError(f"Checkpoint saving failed: {e}")
+
+    def load_checkpoint(self, filepath: str, actor: nn.Module, critic: nn.Module,
+                       actor_optimizer: Optional[optim.Optimizer] = None,
+                       critic_optimizer: Optional[optim.Optimizer] = None):
+        """Load model checkpoint."""
+        try:
+            if not os.path.exists(filepath):
+                raise FileNotFoundError(f"Checkpoint file not found: {filepath}")
+
+            checkpoint = torch.load(filepath, map_location="cpu")
+
+            actor.load_state_dict(checkpoint["actor_state_dict"])
+            critic.load_state_dict(checkpoint["critic_state_dict"])
+
+            if actor_optimizer is not None:
+                actor_optimizer.load_state_dict(checkpoint["actor_optimizer_state_dict"])
+            if critic_optimizer is not None:
+                critic_optimizer.load_state_dict(checkpoint["critic_optimizer_state_dict"])
+
+            logger.info(f"Checkpoint loaded: {filepath}")
+
+            return (checkpoint["episode"], checkpoint["rewards"], 
+                   checkpoint.get("config", None))
+
+        except Exception as e:
+            logger.error(f"Failed to load checkpoint: {e}")
+            raise PPOError(f"Checkpoint loading failed: {e}")
+
+
+class MetricsLogger:
+    """Handles logging and CSV output for training metrics."""
+
+    def __init__(self, log_dir: str):
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        self.train_log_file = self.log_dir / "training_log.csv"
+        self.eval_log_file = self.log_dir / "evaluation_log.csv"
+        self._initialize_csv_files()
+
+    def _initialize_csv_files(self) -> None:
+        """Initialize CSV log files with headers."""
+        try:
+            with open(self.train_log_file, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["episode", "average_reward", "policy_loss", "value_loss",
+                               "entropy", "actor_lr", "critic_lr"])
+
+            with open(self.eval_log_file, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["episode", "evaluation_reward"])
+
+        except Exception as e:
+            logger.error(f"Failed to initialize CSV files: {e}")
+            raise PPOError(f"CSV initialization failed: {e}")
+
+    def log_training_metrics(self, episode: int, avg_reward: float, policy_loss: float,
+                           value_loss: float, entropy: float, actor_lr: float, 
+                           critic_lr: float) -> None:
+        """Log training metrics to CSV."""
+        try:
+            with open(self.train_log_file, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([episode, avg_reward, policy_loss, value_loss,
+                               entropy, actor_lr, critic_lr])
+        except Exception as e:
+            logger.error(f"Failed to log training metrics: {e}")
+
+    def log_evaluation_metrics(self, episode: int, eval_reward: float) -> None:
+        """Log evaluation metrics to CSV."""
+        try:
+            with open(self.eval_log_file, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([episode, eval_reward])
+        except Exception as e:
+            logger.error(f"Failed to log evaluation metrics: {e}")
