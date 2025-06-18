@@ -66,6 +66,8 @@ class MediumDeliveryEnv(gym.Env):
         self.packages_left:        int | None = None
         self.delivery_goal_x:     float | None = None
         self.delivery_goal_y:     float | None = None
+        self.start_x:            float | None = None
+        self.start_y:            float | None = None
 
         # 2. Load map data
         self.map_config = self._load_map(map_config)
@@ -158,6 +160,16 @@ class MediumDeliveryEnv(gym.Env):
             raise ValueError("map_config['obstacles'] must be a list of 4-tuples [(xmin,ymin,xmax,ymax), …]")
         self.obstacles = np.array(obstacles, dtype=np.float32)
 
+        # Start position
+        start_pos = map_config.get("starting_position", None)
+        if start_pos is None:
+            # sample random free position if no start position specified
+            self.start_x, self.start_y = self._sample_free_position()
+        else:
+            if (not isinstance(start_pos, (tuple, list)) or len(start_pos) != 2):
+                raise ValueError("map_config['starting_position'] must be a 2-tuple (x, y)")
+            self.start_x, self.start_y = start_pos
+
         return map_config
     
     def reset(self,*,seed=None, options=None):
@@ -180,7 +192,7 @@ class MediumDeliveryEnv(gym.Env):
             self.rng = np.random.default_rng(seed)
         
         # reset agent to random position and orientation
-        self.agent_x, self.agent_y = self._sample_free_position()
+        self.agent_x, self.agent_y = self.start_x, self.start_y
         self.agent_theta = self.rng.uniform(-np.pi,np.pi)
 
         # reset environmental params
