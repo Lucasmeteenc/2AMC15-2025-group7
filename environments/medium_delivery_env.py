@@ -55,7 +55,7 @@ class MediumDeliveryEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": FPS}
 
-    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=None):
+    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=42):
         super().__init__()
 
         # 1. Init state params
@@ -104,6 +104,14 @@ class MediumDeliveryEnv(gym.Env):
 
         # 7. RNG
         self.rng = np.random.default_rng(seed)
+        
+        # Track the number of episodes
+        self.nr_resets = 0
+        # Generate 10000 random start positions
+        self.start_positions = [
+            self._sample_free_position() for _ in range(10000)
+        ]
+        
 
         # 8. flags
         self.hit_wall:          bool | None = None
@@ -180,7 +188,7 @@ class MediumDeliveryEnv(gym.Env):
             self.rng = np.random.default_rng(seed)
         
         # reset agent to random position and orientation
-        self.agent_x, self.agent_y = self._sample_free_position()
+        self.agent_x, self.agent_y = self.start_positions[self.nr_resets % len(self.start_positions)]
         self.agent_theta = self.rng.uniform(-np.pi,np.pi)
 
         # reset environmental params
@@ -201,6 +209,9 @@ class MediumDeliveryEnv(gym.Env):
         info = {}
         if self.render_mode == "human":
             self.render()
+            
+        # increment the number of resets
+        self.nr_resets += 1
 
         return obs, info
 

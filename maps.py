@@ -6,6 +6,7 @@ MAIL_DELIVERY_MAPS = {
         # ── fixed locations ────────────────────────────────────────────────
         "depot": (3.0, 1.0),           # lone pick-up point
         "delivery": (7.0, 9.0),      # lone drop-off point
+        # "starting_position": (4.0, 6.0), # starting position of the robot
 
         # ── obstacles (axis-aligned boxes) ─────────────────────────────────
         #    xmin, ymin, xmax, ymax
@@ -22,6 +23,7 @@ MAIL_DELIVERY_MAPS = {
         # ── fixed locations ────────────────────────────────────────────────
         "depot": (1.0, 1.0),           # lone pick-up point
         "delivery": (8.0, 9.0),      # lone drop-off point
+        # "starting_position": (5.0, 5.0), # starting position of the robot
 
         # ── obstacles (axis-aligned boxes) ─────────────────────────────────
         #    xmin, ymin, xmax, ymax
@@ -38,6 +40,7 @@ MAIL_DELIVERY_MAPS = {
         # ── fixed locations ────────────────────────────────────────────────
         "depot": (5.5, 6.0),           # lone pick-up point
         "delivery": (5.5, 2.5),      # lone drop-off point
+        # "starting_position": (1.0, 1.0), # starting position of the robot
 
         # ── obstacles (axis-aligned boxes) ─────────────────────────────────
         #    xmin, ymin, xmax, ymax
