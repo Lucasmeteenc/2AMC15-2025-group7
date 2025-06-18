@@ -249,3 +249,7 @@ models/Gen3/
 
 
 test.ipynb
+
+videos/
+logs/
+*.pt

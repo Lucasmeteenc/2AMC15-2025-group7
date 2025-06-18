@@ -8,6 +8,9 @@ import sys
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+import wandb
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -24,6 +27,8 @@ from ppo_utils import (
 )
 
 import gymnasium as gym
+from gymnasium.wrappers import RecordVideo
+
 
 # Configure logging
 logging.basicConfig(
@@ -57,8 +62,8 @@ class PPOConfig:
     clip_range: float = 0.2  # ε in clipped objective
     gamma: float = 0.99  # discount
     gae_lambda: float = 0.95  # λ for GAE
-    value_coef: float = 0.5  # c₁
-    entropy_coef: float = 0.0  # c₂
+    value_coef: float = 0.5  # c1
+    entropy_coef: float = 0.0  # c2
     max_grad_norm: float = 0.5  # global grad-clip
 
     use_gae: bool = True
@@ -74,6 +79,7 @@ class PPOConfig:
 
     log_dir: str = "logs"
     checkpoint_dir: str = "checkpoints"
+    video_dir: str = "videos"
 
     def __post_init__(self):
         if self.total_timesteps < 1:
@@ -91,8 +97,11 @@ class PPOConfig:
 class PPOAgent:
     """Main PPO agent class that orchestrates training and evaluation."""
 
-    def __init__(self, config: PPOConfig, device: Optional[torch.device] = None):
+    def __init__(
+        self, config: PPOConfig, device: Optional[torch.device] = None, wandb_run=None
+    ):
         self.config = config
+        self.wandb = wandb_run
         self.device = device or torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
@@ -287,38 +296,63 @@ class PPOAgent:
         )
 
     @torch.no_grad()
-    def evaluate(self, env) -> float:
+    def evaluate(self, env: gym.Env) -> tuple[float, Path | None]:
         """
-        Run *one* evaluation episode with the current greedy policy.
+        Roll one evaluation episode.
+
+        Parameters
+        ----------
+        env    : a *single* Gymnasium environment
+
+        Returns
+        -------
+        episode_return : float
+        video_path     : pathlib.Path or None
         """
-        obs_np, _ = env.reset(seed=self.config.seed + 123)
-        obs = torch.from_numpy(obs_np).float().to(self.device)
+        obs_np, _ = env.reset()
+        obs = torch.from_numpy(np.asarray(obs_np, dtype=np.float32)).to(self.device)
 
         episode_return = 0.0
         done = False
         while not done:
             logits = self.actor(obs)
-            action = torch.argmax(logits, dim=-1).item()  # greedy
+            dist = torch.distributions.Categorical(logits=logits)
+            action = dist.sample().item()
+
             next_obs_np, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-
             episode_return += reward
-            obs = torch.from_numpy(next_obs_np).float().to(self.device)
 
-        return episode_return
+            obs = torch.from_numpy(np.asarray(next_obs_np, dtype=np.float32)).to(
+                self.device
+            )
 
-    def train(self, train_envs, eval_env):
+            video_path: Path | None = None
+            # if hasattr(env, "video_recorder") and env.video_recorder is not None:
+            #     # Get path before closing
+            #     base_path = env.video_recorder.base_path
+            #     logger.info(f"Video base_path: {base_path}")
+            #     print(base_path)
+            #     video_path = Path(f"{base_path}.mp4")
+            #     print(video_path)
+
+            #     if not video_path.exists():
+            #         logger.warning(f"Expected video at {video_path} but not found")
+            #         video_path = None
+
+            return episode_return, video_path
+
+    def train(self, train_envs):
         """
         Main PPO training loop (vectorised environments, fixed-horizon roll-outs).
         - envs : vectorised training environments (n_envs)
-        - eval_env : single env for evaluation
         """
-        horizon = self.config.horizon  # e.g. 2048
-        n_envs = self.config.num_envs  # e.g. 8
-        total_steps = self.config.total_timesteps  # e.g. 1e6
+        horizon = self.config.horizon
+        n_envs = self.config.num_envs
+        total_steps = self.config.total_timesteps
         n_updates = total_steps // (horizon * n_envs)
 
-        # --- logging buffers --------------------------------------------------
+        # logging
         running_return = np.zeros(self.config.num_envs, dtype=np.float32)
         completed_returns: list[float] = []
 
@@ -326,7 +360,7 @@ class PPOAgent:
         obs = torch.from_numpy(obs).to(self.device)
 
         for update in range(1, n_updates + 1):
-            # 1. Roll-out ------------------------------------------------------
+            # 1. Roll-out
             storage, last_values, obs = self.collect_rollout(train_envs, obs)
 
             # unpack into T × n_envs tensors
@@ -337,7 +371,7 @@ class PPOAgent:
             actions = torch.stack([b["act"] for b in storage])
             states = torch.stack([b["obs"] for b in storage])
 
-            # 2. Advantage / return calculation -------------------------------
+            # 2. Advantage / return calculation
             if self.config.use_gae:
                 advantages, returns = self.advantage_calculator.calculate_gae(
                     rewards,
@@ -363,18 +397,18 @@ class PPOAgent:
             returns_f = AdvantageCalculator.flatten_time_env(returns)
             adv_f = AdvantageCalculator.flatten_time_env(advantages)
 
-            # 3. PPO policy & value update ------------------------------------
+            # 3. PPO policy & value update
             pi_loss, v_loss, entropy = self.update_policy(
                 states_f, actions_f, logp_f, adv_f, returns_f
             )
 
-            # 4. LR schedulers -------------------------------------------------
+            # 4. LR schedulers
             if self.actor_scheduler:
                 self.actor_scheduler.step()
             if self.critic_scheduler:
                 self.critic_scheduler.step()
 
-            # 5. Episode-level reward bookkeeping -----------------------------
+            # 5. Episode-level reward bookkeeping
             # accumulate rewards per env and extract completed returns
             rew_np = rewards.cpu().numpy()
             done_np = dones.cpu().numpy()
@@ -385,7 +419,7 @@ class PPOAgent:
                         completed_returns.append(float(running_return[env_i]))
                         running_return[env_i] = 0.0
 
-            # 6. Logging -------------------------------------------------------
+            # 6. Logging
             if update % self.config.log_interval == 0:
                 recent = completed_returns[-self.config.log_window :]
                 avg_ret = np.mean(recent) if recent else 0.0
@@ -405,13 +439,37 @@ class PPOAgent:
                     self.actor_optimizer.param_groups[0]["lr"],
                     self.critic_optimizer.param_groups[0]["lr"],
                 )
+            if self.wandb and update % self.config.log_interval == 0:
+                steps_per_update = self.config.horizon * self.config.num_envs
+                self.wandb.log(
+                    {
+                        "train/avg_ep_return": avg_ret,
+                        "train/policy_loss": pi_loss,
+                        "train/value_loss": v_loss,
+                        "train/entropy": entropy,
+                        "train/actor_lr": self.actor_optimizer.param_groups[0]["lr"],
+                        "train/critic_lr": self.critic_optimizer.param_groups[0]["lr"],
+                        "global_step": update * steps_per_update,
+                    }
+                )
 
-            # 7. Evaluation ----------------------------------------------------
+            # 7. Evaluation
             if update % self.config.eval_interval == 0:
-                eval_ret = self.evaluate(eval_env)
-                self.metrics_logger.log_evaluation_metrics(update, eval_ret)
+                eval_env = make_eval_env(
+                    self.config.video_dir, seed=self.config.seed + update
+                )
+                eval_ret, vid_path = self.evaluate(eval_env)
 
-            # 8. Checkpoint ----------------------------------------------------
+                if self.wandb:
+                    log_data = {
+                        "eval/return": eval_ret,
+                        "global_step": update * steps_per_update,
+                    }
+                    if vid_path and vid_path.is_file():
+                        log_data["eval/video"] = wandb.Video(str(vid_path), fps=30)
+                    self.wandb.log(log_data)
+
+            # 8. Checkpoint
             if update % self.config.checkpoint_interval == 0:
                 self.checkpoint_manager.save_checkpoint(
                     self.actor,
@@ -424,7 +482,7 @@ class PPOAgent:
                     f"ckpt_update{update}.pt",
                 )
 
-            # 9. Early-stopping -----------------------------------------------
+            # 9. Early-stopping
             if (
                 len(completed_returns) >= self.config.early_stop_window
                 and np.mean(completed_returns[-self.config.early_stop_window :])
@@ -433,7 +491,7 @@ class PPOAgent:
                 logger.info(f"Solved! Stopping at update {update}")
                 break
 
-        # --- final save -------------------------------------------------------
+        # final save
         self.checkpoint_manager.save_checkpoint(
             self.actor,
             self.critic,
@@ -450,75 +508,78 @@ class PPOAgent:
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create argument parser with PPOConfig defaults."""
     p = argparse.ArgumentParser(description="PPO Training Configuration")
-
-    # Get default config
     default = PPOConfig()
 
-    # sampler
+    # Sampler
     p.add_argument(
         "--num-envs",
         type=int,
         default=default.num_envs,
-        help="Number of parallel environments (N).",
+        help="Number of parallel environments (N)",
     )
     p.add_argument(
         "--horizon",
         type=int,
         default=default.horizon,
-        help="Roll-out length per env before each optimisation phase (T).",
+        help="Roll-out length per env before each optimisation phase (T)",
     )
     p.add_argument(
         "--total-timesteps",
         type=int,
         default=default.total_timesteps,
-        help="Stop training after this many environment steps.",
+        help="Stop training after this many environment steps",
     )
 
-    # network
+    # Network
     p.add_argument(
         "--hidden-dim",
         type=int,
         default=default.hidden_dim,
-        help="Width of each of the two fully-connected layers.",
+        help="Width of each of the two fully-connected layers",
     )
 
-    #  optimisation
+    # Optimization
     p.add_argument("--learning-rate", type=float, default=default.learning_rate)
     p.add_argument(
         "--batch-size",
         type=int,
         default=default.batch_size,
-        help="Minibatch size for SGD inside each PPO update.",
+        help="Minibatch size for SGD inside each PPO update",
     )
     p.add_argument(
         "--n-epochs",
         type=int,
         default=default.n_epochs,
-        help="Number of gradient passes per PPO update.",
+        help="Number of gradient passes per PPO update",
     )
     p.add_argument(
         "--clip-range",
         type=float,
         default=default.clip_range,
-        help="ε in the PPO clipped objective.",
+        help="ε in the PPO clipped objective",
     )
     p.add_argument("--gamma", type=float, default=default.gamma)
     p.add_argument("--gae-lambda", type=float, default=default.gae_lambda)
     p.add_argument("--value-coef", type=float, default=default.value_coef)
     p.add_argument("--entropy-coef", type=float, default=default.entropy_coef)
     p.add_argument("--max-grad-norm", type=float, default=default.max_grad_norm)
+    p.add_argument("--use-gae", type=bool, default=default.use_gae)
 
-    # misc
+    # Logging & checkpointing
     p.add_argument("--seed", type=int, default=default.seed)
     p.add_argument("--log-interval", type=int, default=default.log_interval)
     p.add_argument("--eval-interval", type=int, default=default.eval_interval)
     p.add_argument(
         "--checkpoint-interval", type=int, default=default.checkpoint_interval
     )
+    p.add_argument("--early-stop-window", type=int, default=default.early_stop_window)
+    p.add_argument("--reward-threshold", type=float, default=default.reward_threshold)
+    p.add_argument("--log-window", type=int, default=default.log_window)
+
+    # Directories
     p.add_argument("--log-dir", type=str, default=default.log_dir)
     p.add_argument("--checkpoint-dir", type=str, default=default.checkpoint_dir)
-    # p.add_argument("--resume-from",   type=str, default=None,
-    #                help="Path to a saved checkpoint to resume training.")
+    p.add_argument("--video-dir", type=str, default=default.video_dir)
 
     return p
 
@@ -542,6 +603,41 @@ def create_environment(render_mode: Optional[str] = None):
         raise PPOError(f"Environment creation failed: {e}")
 
 
+def make_eval_env(video_root: str, seed: int) -> gym.Env:
+    """
+    A single evaluation environment that records every episode to disk.
+    The video path for the most-recent episode is available via
+    env.video_recorder.last_video_path  (Gymnasium ≥ 0.29).
+    """
+    env = create_environment(render_mode="rgb_array")
+
+    env = RecordVideo(
+        env,
+        video_folder=video_root,
+        episode_trigger=lambda ep: True,
+        name_prefix="ppo_eval",
+        disable_logger=True,
+    )
+    return env
+
+
+def make_vec_env(num_envs: int, seed: int) -> gym.vector.VectorEnv:
+    """Return a SyncVectorEnv (1) or AsyncVectorEnv (≥2)."""
+
+    def _factory(rank: int):
+        def _thunk():
+            env = create_environment(render_mode=None)
+            env.action_space.seed(seed + rank)
+            return env
+
+        return _thunk
+
+    env_fns = [_factory(i) for i in range(num_envs)]
+    if num_envs == 1:
+        return gym.vector.SyncVectorEnv(env_fns)
+    return gym.vector.AsyncVectorEnv(env_fns)
+
+
 def main() -> None:
     """
     Launch PPO training with vectorised training envs
@@ -551,50 +647,31 @@ def main() -> None:
     args = parser.parse_args()
 
     config = PPOConfig(**vars(args))
+
+    wandb_run = wandb.init(
+        project="medium-delivery-ppo",
+        name=f"PPO-{config.num_envs}envs-{config.horizon}T",
+        config=config.__dict__,
+        tags=["ppo", "gymnasium"],
+    )
+
     set_random_seeds(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # ------------------------------------------------------------
     # 1. Vectorised training environments
-    # ------------------------------------------------------------
-    def make_single_env(seed_offset: int):
-        """
-        Return a thunk that creates ONE environment instance.
-        Gymnasium-style, so we can feed it to SyncVectorEnv/SubprocVectorEnv.
-        """
+    train_envs = make_vec_env(config.num_envs, config.seed)
 
-        def _thunk():
-            env = create_environment(render_mode=None)
-            # env.seed(args.seed + seed_offset)
-            return env
-
-        return _thunk
-
-    env_fns = [make_single_env(i) for i in range(args.num_envs)]
-    if args.num_envs == 1:
-        train_envs = gym.vector.SyncVectorEnv(env_fns)
-    else:
-        # subprocess version scales better for ≥2 envs with CPU-bound sims
-        train_envs = gym.vector.AsyncVectorEnv(env_fns)
-
-    # 2. Single evaluation env (human render optional)
-    eval_env = create_environment(render_mode="human")
-
-    # 3. Dimensionality from ONE env instance (they're identical)
+    # 2. Dimensionality from ONE env instance
     state_space_size = train_envs.single_observation_space.shape[0]
     action_space_size = train_envs.single_action_space.n
 
-    # ------------------------------------------------------------
-    # 4. PPO Agent
-    # ------------------------------------------------------------
-    agent = PPOAgent(config, device)
+    # 3. PPO Agent
+    agent = PPOAgent(config, device, wandb_run)
     agent.setup_networks(state_space_size, action_space_size)
 
-    # ------------------------------------------------------------
-    # 5. Training loop
-    # ------------------------------------------------------------
-    train_returns = agent.train(train_envs, eval_env)
+    # 4. Training loop
+    train_returns = agent.train(train_envs)
 
     logger.info("Training completed successfully!")
     if train_returns:
@@ -602,8 +679,8 @@ def main() -> None:
             f"Final 100-episode avg return: {np.mean(train_returns[-100:]):.2f}"
         )
 
+    wandb_run.finish()
     train_envs.close()
-    eval_env.close()
 
 
 if __name__ == "__main__":

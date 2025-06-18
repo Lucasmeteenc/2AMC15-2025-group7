@@ -1,6 +1,6 @@
 """
 Utility classes for PPO implementation.
-Contains advantage calculation, exploration, loss calculation, checkpointing, and logging.
+Contains advantage calculation, checkpointing, and logging.
 """
 
 import csv
