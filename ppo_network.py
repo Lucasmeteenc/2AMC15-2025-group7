@@ -3,9 +3,9 @@ Neural network components for PPO implementation.
 Contains Actor, Critic networks and NetworkFactory.
 """
 
-import torch
 import torch.nn as nn
 import numpy as np
+
 
 class NetworkFactory:
     """Factory class for creating neural networks."""
@@ -38,7 +38,7 @@ class Actor(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
-                nn.init.constant_(m.bias, 0.)
+                nn.init.constant_(m.bias, 0.0)
         # output layer gets small gain (0.01) so early updates are gentle
         nn.init.orthogonal_(self.logits_head.weight, gain=0.01)
 
@@ -46,7 +46,8 @@ class Actor(nn.Module):
         if state.dim() == 1:
             state = state.unsqueeze(0)
         x = self.backbone(state)
-        return self.logits_head(x)               # logits
+        return self.logits_head(x)  # logits
+
 
 class Critic(nn.Module):
     def __init__(self, input_dim: int):

@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -27,10 +26,10 @@ class AdvantageCalculator:
 
     @staticmethod
     def calculate_returns(
-        rewards: torch.Tensor,          # (T, N)
-        dones:   torch.Tensor,          # (T, N) bool
-        last_values: torch.Tensor,      # (N,)
-        gamma:   float,
+        rewards: torch.Tensor,  # (T, N)
+        dones: torch.Tensor,  # (T, N) bool
+        last_values: torch.Tensor,  # (N,)
+        gamma: float,
     ) -> torch.Tensor:
         """
         Discounted returns without GAE (equivalent to λ = 1).
@@ -39,22 +38,22 @@ class AdvantageCalculator:
         device = rewards.device
 
         returns = torch.zeros((T, N), device=device)
-        running = last_values          # V(s_T)
+        running = last_values  # V(s_T)
 
         for t in reversed(range(T)):
-            mask = 1.0 - dones[t].float()   # zero after terminal
+            mask = 1.0 - dones[t].float()  # zero after terminal
             running = rewards[t] + gamma * running * mask
             returns[t] = running
         return returns
 
     @staticmethod
     def calculate_gae(
-        rewards:  torch.Tensor,        # (T, N)
-        values:   torch.Tensor,        # (T, N)
-        dones:    torch.Tensor,        # (T, N)  bool
-        last_values: torch.Tensor,     # (N,)
-        gamma:    float,
-        lam:      float,
+        rewards: torch.Tensor,  # (T, N)
+        values: torch.Tensor,  # (T, N)
+        dones: torch.Tensor,  # (T, N)  bool
+        last_values: torch.Tensor,  # (N,)
+        gamma: float,
+        lam: float,
     ):
         """Returns (advantages, returns) each shaped (T, N)."""
         T, N = rewards.shape
@@ -73,71 +72,13 @@ class AdvantageCalculator:
             gae = delta + gamma * lam * gae * mask
             advantages[t] = gae
 
-        returns = advantages + values                                # V-targets
+        returns = advantages + values  # V-targets
         return advantages, returns
     
-class ExplorationScheduler:
-    """Manages exploration strategy with epsilon-greedy scheduling."""
-
-    def __init__(self, config):
-        self.initial_eps = config.exploration_initial_eps
-        self.final_eps = config.exploration_final_eps
-        self.exploration_fraction = config.exploration_fraction
-        self.total_episodes = config.n_episodes
-
-    def get_epsilon(self, episode: int) -> float:
-        """Get epsilon value for current episode."""
-        exploration_episodes = int(self.exploration_fraction * self.total_episodes)
-
-        if episode < exploration_episodes:
-            epsilon_progress = episode / exploration_episodes
-            return (self.initial_eps * (1 - epsilon_progress) + 
-                   self.final_eps * epsilon_progress)
-        else:
-            return self.final_eps
-
-    def get_exploration_weights(self, state: np.ndarray, env, episode: int) -> List[float]:
-        if len(state) < 2:
-            return [0.33, 0.33, 0.34]
-
-        # Stronger forward bias early in training
-        base_forward_weight = 0.95
-        decay_factor = max(0.5, 1.0 - episode / 2000)  # Slower decay
-        adjusted_forward_weight = base_forward_weight * decay_factor + (1 - decay_factor) * (1 / 3)
-
-        # Only reduce forward weight if currently near boundaries
-        norm_x, norm_y = state[0], state[1]
-        near_boundary = norm_x < 0.1 or norm_x > 0.9 or norm_y < 0.1 or norm_y > 0.9
-
-        if near_boundary:
-            return [0.4, 0.3, 0.3]
-        else:
-            return [adjusted_forward_weight, (1 - adjusted_forward_weight) / 2,
-                (1 - adjusted_forward_weight) / 2]
-        
-class PPOLoss:
-    """PPO loss calculation utilities."""
-
     @staticmethod
-    def calculate_policy_loss(log_probs_old: torch.Tensor, log_probs_new: torch.Tensor,
-                            advantages: torch.Tensor, epsilon: float) -> torch.Tensor:
-        """Calculate the clipped PPO policy loss."""
-        try:
-            # Calculate probability ratio
-            ratio = torch.exp(log_probs_new - log_probs_old)
-
-            # Clipped objective
-            clipped_ratio = torch.clamp(ratio, 1.0 - epsilon, 1.0 + epsilon)
-
-            # Take minimum of clipped and unclipped objective
-            surrogate_loss = torch.min(ratio * advantages, clipped_ratio * advantages)
-            # print(f"surrogate_loss before mean: {surrogate_loss[:5]}")
-            # print(f"final loss: {-surrogate_loss.mean()}")
-
-            return -surrogate_loss.mean()
-        except Exception as e:
-            logger.error(f"Error calculating PPO loss: {e}")
-            raise PPOError(f"PPO loss calculation failed: {e}")
+    def flatten_time_env(tensor: torch.Tensor) -> torch.Tensor:
+        """Collapse (time, env) into batch dimension."""
+        return tensor.reshape(-1, *tensor.shape[2:])
 
 
 class CheckpointManager:
@@ -147,10 +88,17 @@ class CheckpointManager:
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    def save_checkpoint(self, actor: nn.Module, critic: nn.Module,
-                       actor_optimizer: optim.Optimizer, critic_optimizer: optim.Optimizer,
-                       episode: int, rewards: List[float], config,
-                       filepath: Optional[str] = None) -> str:
+    def save_checkpoint(
+        self,
+        actor: nn.Module,
+        critic: nn.Module,
+        actor_optimizer: optim.Optimizer,
+        critic_optimizer: optim.Optimizer,
+        episode: int,
+        rewards: List[float],
+        config,
+        filepath: Optional[str] = None,
+    ) -> str:
         """Save model checkpoint."""
         if filepath is None:
             filepath = self.checkpoint_dir / f"checkpoint_ep{episode}.pt"
@@ -175,9 +123,14 @@ class CheckpointManager:
             logger.error(f"Failed to save checkpoint: {e}")
             raise PPOError(f"Checkpoint saving failed: {e}")
 
-    def load_checkpoint(self, filepath: str, actor: nn.Module, critic: nn.Module,
-                       actor_optimizer: Optional[optim.Optimizer] = None,
-                       critic_optimizer: Optional[optim.Optimizer] = None):
+    def load_checkpoint(
+        self,
+        filepath: str,
+        actor: nn.Module,
+        critic: nn.Module,
+        actor_optimizer: Optional[optim.Optimizer] = None,
+        critic_optimizer: Optional[optim.Optimizer] = None,
+    ):
         """Load model checkpoint."""
         try:
             if not os.path.exists(filepath):
@@ -189,14 +142,21 @@ class CheckpointManager:
             critic.load_state_dict(checkpoint["critic_state_dict"])
 
             if actor_optimizer is not None:
-                actor_optimizer.load_state_dict(checkpoint["actor_optimizer_state_dict"])
+                actor_optimizer.load_state_dict(
+                    checkpoint["actor_optimizer_state_dict"]
+                )
             if critic_optimizer is not None:
-                critic_optimizer.load_state_dict(checkpoint["critic_optimizer_state_dict"])
+                critic_optimizer.load_state_dict(
+                    checkpoint["critic_optimizer_state_dict"]
+                )
 
             logger.info(f"Checkpoint loaded: {filepath}")
 
-            return (checkpoint["episode"], checkpoint["rewards"], 
-                   checkpoint.get("config", None))
+            return (
+                checkpoint["episode"],
+                checkpoint["rewards"],
+                checkpoint.get("config", None),
+            )
 
         except Exception as e:
             logger.error(f"Failed to load checkpoint: {e}")
@@ -219,8 +179,17 @@ class MetricsLogger:
         try:
             with open(self.train_log_file, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["episode", "average_reward", "policy_loss", "value_loss",
-                               "entropy", "actor_lr", "critic_lr"])
+                writer.writerow(
+                    [
+                        "episode",
+                        "average_reward",
+                        "policy_loss",
+                        "value_loss",
+                        "entropy",
+                        "actor_lr",
+                        "critic_lr",
+                    ]
+                )
 
             with open(self.eval_log_file, "w", newline="") as f:
                 writer = csv.writer(f)
@@ -230,15 +199,31 @@ class MetricsLogger:
             logger.error(f"Failed to initialize CSV files: {e}")
             raise PPOError(f"CSV initialization failed: {e}")
 
-    def log_training_metrics(self, episode: int, avg_reward: float, policy_loss: float,
-                           value_loss: float, entropy: float, actor_lr: float, 
-                           critic_lr: float) -> None:
+    def log_training_metrics(
+        self,
+        episode: int,
+        avg_reward: float,
+        policy_loss: float,
+        value_loss: float,
+        entropy: float,
+        actor_lr: float,
+        critic_lr: float,
+    ) -> None:
         """Log training metrics to CSV."""
         try:
             with open(self.train_log_file, "a", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow([episode, avg_reward, policy_loss, value_loss,
-                               entropy, actor_lr, critic_lr])
+                writer.writerow(
+                    [
+                        episode,
+                        avg_reward,
+                        policy_loss,
+                        value_loss,
+                        entropy,
+                        actor_lr,
+                        critic_lr,
+                    ]
+                )
         except Exception as e:
             logger.error(f"Failed to log training metrics: {e}")
 
