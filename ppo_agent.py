@@ -28,6 +28,7 @@ from ppo_utils import (
 
 import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
+from maps import MAIL_DELIVERY_MAPS
 
 
 # Configure logging
@@ -79,6 +80,7 @@ class PPOConfig:
     log_dir: str = "logs"
     checkpoint_dir: str = "checkpoints"
     video_dir: str = "videos"
+    map_name: str = "empty"
 
     def __post_init__(self):
         if self.total_timesteps < 1:
@@ -459,9 +461,7 @@ class PPOAgent:
 
             # 7. Evaluation
             if update % self.config.eval_interval == 0:
-                eval_env = make_eval_env(
-                    self.config.video_dir, seed=self.config.seed + update
-                )
+                eval_env = make_eval_env(self.config, self.config.video_dir, seed=self.config.seed + update)
                 eval_ret, vid_path = self.evaluate(eval_env)
 
                 if self.wandb:
@@ -587,6 +587,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--log-dir", type=str, default=default.log_dir)
     p.add_argument("--checkpoint-dir", type=str, default=default.checkpoint_dir)
     p.add_argument("--video-dir", type=str, default=default.video_dir)
+    p.add_argument("--map-name", type=str, default=default.map_name)
 
     return p
 
@@ -600,23 +601,24 @@ def set_random_seeds(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
-def create_environment(render_mode: Optional[str] = None):
+def create_environment(config: PPOConfig, render_mode: Optional[str] = None):
     """Create and validate environment."""
     try:
-        env = MediumDeliveryEnv(render_mode=render_mode)
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode)
+        print(f"Created environment with map: {config.map_name}")
         return env
     except Exception as e:
         logger.error(f"Failed to create environment: {e}")
         raise PPOError(f"Environment creation failed: {e}")
 
 
-def make_eval_env(video_root: str, seed: int) -> gym.Env:
+def make_eval_env(config: PPOConfig, video_root: str, seed: int) -> gym.Env:
     """
     A single evaluation environment that records every episode to disk.
     The video path for the most-recent episode is available via
     env.video_recorder.last_video_path  (Gymnasium ≥ 0.29).
     """
-    env = create_environment(render_mode="rgb_array")
+    env = create_environment(config, render_mode="rgb_array")
 
     env = RecordVideo(
         env,
@@ -628,12 +630,12 @@ def make_eval_env(video_root: str, seed: int) -> gym.Env:
     return env
 
 
-def make_vec_env(num_envs: int, seed: int) -> gym.vector.VectorEnv:
+def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.VectorEnv:
     """Return a SyncVectorEnv (1) or AsyncVectorEnv (≥2)."""
 
     def _factory(rank: int):
         def _thunk():
-            env = create_environment(render_mode=None)
+            env = create_environment(config, render_mode=None)
             env.action_space.seed(seed + rank)
             return env
 
@@ -667,7 +669,7 @@ def main() -> None:
     logger.info(f"Using device: {device}")
 
     # 1. Vectorised training environments
-    train_envs = make_vec_env(config.num_envs, config.seed)
+    train_envs = make_vec_env(config, config.num_envs, config.seed)
 
     # 2. Dimensionality from ONE env instance
     state_space_size = train_envs.single_observation_space.shape[0]

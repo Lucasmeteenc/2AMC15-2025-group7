@@ -6,6 +6,7 @@ from gymnasium.wrappers import RecordVideo
 from ppo_network import NetworkFactory
 from environments.medium_delivery_env import MediumDeliveryEnv
 from ppo_agent import PPOConfig  # Import PPOConfig to allowlist it
+from maps import MAIL_DELIVERY_MAPS
 
 # Allowlist PPOConfig for safe deserialization
 torch.serialization.add_safe_globals([PPOConfig])
@@ -52,7 +53,7 @@ def main():
     Path(video_dir).mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    env = MediumDeliveryEnv(render_mode="rgb_array")
+    env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS["default"], render_mode="rgb_array")
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
