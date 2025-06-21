@@ -73,8 +73,7 @@ class PPOConfig:
     log_interval: int = 1  # updates between train logs
     eval_interval: int = 10  # updates between eval roll-outs
     checkpoint_interval: int = 20  # updates between checkpoints
-    early_stop_window: int = 100
-    reward_threshold: float = 5_000.0
+    patience: int = 5  # Number of consecutive windows without improvement before stopping
     log_window: int = 100
 
     log_dir: str = "logs"
@@ -110,6 +109,11 @@ class PPOAgent:
         self.checkpoint_manager = CheckpointManager(config.checkpoint_dir)
         self.metrics_logger = MetricsLogger(config.log_dir)
         self.advantage_calculator = AdvantageCalculator()
+        
+        # Initialize best average return
+        self.best_avg_return = float('-inf')
+        # Counter for epochs without improvement
+        self.epochs_without_improvement = 0
 
         # Initialize networks (will be set up in setup_networks)
         self.actor = None
@@ -482,14 +486,19 @@ class PPOAgent:
                     f"ckpt_update{update}.pt",
                 )
 
-            # 9. Early-stopping
-            if (
-                len(completed_returns) >= self.config.early_stop_window
-                and np.mean(completed_returns[-self.config.early_stop_window :])
-                >= self.config.reward_threshold
-            ):
-                logger.info(f"Solved! Stopping at update {update}")
-                break
+            # 9. Early Stopping
+            if update % self.config.log_interval == 0:
+                if avg_ret > self.best_avg_return:
+                    self.best_avg_return = avg_ret  # Update best average return
+                    self.epochs_without_improvement = 0  # Reset counter
+                else:
+                    self.epochs_without_improvement += 1  # Increment counter
+
+                if self.epochs_without_improvement >= self.config.patience:
+                    logger.info(
+                        f"Stopping early at update {update} due to no improvement in average return for {self.config.patience} consecutive epochs."
+                    )
+                    break
 
         # final save
         self.checkpoint_manager.save_checkpoint(
@@ -572,8 +581,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--checkpoint-interval", type=int, default=default.checkpoint_interval
     )
-    p.add_argument("--early-stop-window", type=int, default=default.early_stop_window)
-    p.add_argument("--reward-threshold", type=float, default=default.reward_threshold)
     p.add_argument("--log-window", type=int, default=default.log_window)
 
     # Directories
