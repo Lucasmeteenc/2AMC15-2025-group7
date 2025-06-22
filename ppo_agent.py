@@ -47,7 +47,7 @@ class PPOConfig:
     """Configuration class for PPO training parameters."""
 
     # Sampler
-    total_timesteps: int = 1_000_000  # stop criterion
+    total_timesteps: int = 2_000_000  # stop criterion
     horizon: int = 2_048  # T  (steps per env before an update)
     num_envs: int = 8  # N  (parallel envs)
 
