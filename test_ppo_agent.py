@@ -8,6 +8,10 @@ from environments.medium_delivery_env import MediumDeliveryEnv
 from ppo_agent import PPOConfig  # Import PPOConfig to allowlist it
 from maps import MAIL_DELIVERY_MAPS
 
+# Ignore all warnings
+import warnings
+warnings.filterwarnings("ignore")
+
 # Allowlist PPOConfig for safe deserialization
 torch.serialization.add_safe_globals([PPOConfig])
 
@@ -25,13 +29,15 @@ def test_model(actor, env, device: torch.device, video_dir: str):
     obs_np, _ = env.reset()
     obs = torch.from_numpy(np.asarray(obs_np, dtype=np.float32)).to(device)
 
+    total_reward = 0.0
     done = False
     while not done:
         logits = actor(obs)
         dist = torch.distributions.Categorical(logits=logits)
         action = dist.sample().item()
 
-        next_obs_np, _, terminated, truncated, _ = env.step(action)
+        next_obs_np, reward, terminated, truncated, _ = env.step(action)
+        total_reward += reward
         done = terminated or truncated
         obs = torch.from_numpy(np.asarray(next_obs_np, dtype=np.float32)).to(device)
 
@@ -45,20 +51,26 @@ def test_model(actor, env, device: torch.device, video_dir: str):
             video_path = None
 
     env.close()
-    return video_path
+    return total_reward, video_path
 
 def main():
-    model_path = "final_model.pt"
-    video_dir = "test_videos"
+    map = "default"
+    trials = 10
+    model_path = "checkpoints_ppo/final_model_default.pt"
+    video_dir = f"videos/test_videos_ppo_{map}"
     Path(video_dir).mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS["default"], render_mode="rgb_array")
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
-
     actor = load_model(model_path, state_size, action_size, device)
-    test_model(actor, env, device, video_dir)
+    
+    for i in range(1, trials + 1):
+        total_reward, video_path = test_model(actor, env, device, video_dir)
+        print(f"Test episode {i} reward: {total_reward}")
+        if video_path:
+            print(f"Video saved at: {video_path}")
 
 if __name__ == "__main__":
     main()
