@@ -20,6 +20,8 @@ from model_custom_dqn import Linear_QNetGen2, QTrainer
 from environments.medium_delivery_env import MediumDeliveryEnv
 from maps import MAIL_DELIVERY_MAPS
 
+EVAL_FREQUENCY_STEPS = 10_000  # Frequency of evaluation in training steps
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -33,19 +35,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DQNConfig:
-    total_episodes: int = 5000
+    total_episodes: int = 10000
     batch_size: int = 32
     memory_size: int = 10000
     learning_rate: float = 0.0005
     gamma: float = 0.99
     epsilon_start: float = 1.0
-    epsilon_end: float = 0.05
-    epsilon_decay: float = 0.995
+    epsilon_end: float = 0.0
+    epsilon_decay: float = 0.9955
     hidden_dim: int = 64
-    checkpoint_dir: str = "checkpoints"
+    checkpoint_dir: str = "checkpoints_dqn"
     log_interval: int = 10
     seed: int = 0
-    map_name: str = "empty"
+    map_name: str = "default"
     target_update_interval: int = 50
 
 class DQNAgent:
@@ -74,10 +76,11 @@ class DQNAgent:
         else:
             mini_sample = self.memory
         states, actions, rewards, next_states, done = zip(*mini_sample)
-        self._train_step_with_target(states, actions, rewards, next_states, done)
+        batch_loss = self._train_step_with_target(states, actions, rewards, next_states, done)
+        return batch_loss
 
     def train_short_memory(self, state, action, reward, next_state, done):
-        self._train_step_with_target([state], [action], [reward], [next_state], [done])
+        _ = self._train_step_with_target([state], [action], [reward], [next_state], [done])
 
     def _train_step_with_target(self, states, actions, rewards, next_states, done):
         # Use target network for next_state Q-values
@@ -106,6 +109,7 @@ class DQNAgent:
         loss = self.trainer.criterion(target, pred)
         loss.backward()
         self.trainer.optimizer.step()
+        return loss.item()
 
     def get_action(self, state):
         if random.random() < self.epsilon:
@@ -118,12 +122,11 @@ class DQNAgent:
     def update_target_network(self):
         self.target_model.load_state_dict(self.model.state_dict())
 
-    def save(self, score):
+    def save(self, name):
         Path(self.config.checkpoint_dir).mkdir(exist_ok=True)
-        file_name = f"{self.config.checkpoint_dir}/model_{score}.pth"
+        file_name = f"{self.config.checkpoint_dir}/model_{name}.pth"
         self.model.save(file_name=file_name)
         logger.info(f"Model saved to {file_name}")
-
 
 def set_random_seeds(seed: int):
     np.random.seed(seed)
@@ -132,6 +135,7 @@ def set_random_seeds(seed: int):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True)
 
 def create_environment(config: DQNConfig):
     env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None)
@@ -161,50 +165,57 @@ def train(config: DQNConfig, wandb_run=None):
     set_random_seeds(config.seed)
     env = create_environment(config)
     agent = DQNAgent(env.observation_space, env.action_space, config)
-    state_old, info = env.reset()
-    best_score = float('-inf')
+    state_old, _ = env.reset()
     cummulative_reward = 0
-    eval_interval = 25  # Evaluate every N episodes
+    total_env_training_steps = 0
+    next_evaluation_at_step = EVAL_FREQUENCY_STEPS
     for episode in range(1, config.total_episodes + 1):
-        state_old, info = env.reset()
+        state_old, _ = env.reset()
         cummulative_reward = 0
+
         done = False
         while not done:
             action = agent.get_action(state_old)
-            state_new, reward, terminated, truncated, info = env.step(action)
+            state_new, reward, terminated, truncated, _ = env.step(action)
+            total_env_training_steps += 1
             cummulative_reward += reward
             agent.train_short_memory(state_old, action, reward, state_new, terminated)
             agent.remember(state_old, action, reward, state_new, terminated)
             state_old = state_new
             if terminated or truncated:
                 break
+        
         agent.n_game += 1
-        agent.train_long_memory()
+        current_batch_loss = agent.train_long_memory()
+
         # Target network update
         if episode % config.target_update_interval == 0:
             agent.update_target_network()
             logger.info(f"Target network updated at episode {episode}")
+        
         # Epsilon decay
         if episode % config.log_interval == 0:
             agent.epsilon = max(config.epsilon_end, agent.epsilon * config.epsilon_decay)
+        
         logger.info(f"Episode {episode}, Score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
         if wandb_run:
             wandb_run.log({
                 "train/episode": episode,
                 "train/score": cummulative_reward,
                 "train/epsilon": agent.epsilon,
-                "train/best_score": best_score,
+                "train/td_error": current_batch_loss
             })
-        if cummulative_reward > best_score:
-            agent.save(cummulative_reward)
-            best_score = cummulative_reward
+        
         # Evaluation with epsilon=0
-        if wandb_run and episode % eval_interval == 0:
+        if total_env_training_steps >= next_evaluation_at_step and wandb_run:
             eval_score = evaluate_policy(agent, env, config)
             wandb_run.log({
-                "eval/episode": episode,
-                "eval/score_epsilon0": eval_score
+                "eval/average_reward": eval_score,
+                "eval/total_training_steps": total_env_training_steps,
             })
+            next_evaluation_at_step += EVAL_FREQUENCY_STEPS 
+
+    agent.save('final_model')
     env.close()
     logger.info("Training completed.")
 
