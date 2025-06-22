@@ -110,7 +110,7 @@ class MediumDeliveryEnv(gym.Env):
         self.nr_resets = 0
         # Generate 10000 random start positions
         self.start_positions = [
-            self._sample_free_position() for _ in range(10000)
+            self._sample_free_position() for _ in range(20000)
         ]
         
 
