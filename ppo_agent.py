@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import wandb
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -27,9 +26,9 @@ from ppo_utils import (
 )
 
 import gymnasium as gym
-from gymnasium.wrappers import RecordVideo
 from maps import MAIL_DELIVERY_MAPS
 
+EVAL_FREQUENCY_STEPS = 20_000  # Frequency of evaluation in training steps
 
 # Configure logging
 logging.basicConfig(
@@ -72,13 +71,12 @@ class PPOConfig:
     # Rest
     seed: int = 0
     log_interval: int = 1  # updates between train logs
-    eval_interval: int = 10  # updates between eval roll-outs
     checkpoint_interval: int = 20  # updates between checkpoints
     patience: int = 5  # Number of consecutive windows without improvement before stopping
     log_window: int = 100
 
     log_dir: str = "logs"
-    checkpoint_dir: str = "checkpoints"
+    checkpoint_dir: str = "checkpoints_ppo"
     video_dir: str = "videos"
     map_name: str = "empty"
 
@@ -93,7 +91,6 @@ class PPOConfig:
             raise ValueError("batch_size must be in (0, horizon * num_envs]")
         if not (0.0 < self.learning_rate):
             raise ValueError("learning_rate must be positive")
-
 
 class PPOAgent:
     """Main PPO agent class that orchestrates training and evaluation."""
@@ -302,7 +299,7 @@ class PPOAgent:
         )
 
     @torch.no_grad()
-    def evaluate(self, env: gym.Env) -> tuple[float, Path | None]:
+    def evaluate(self, env: gym.Env) -> float:
         """
         Roll one evaluation episode.
 
@@ -313,7 +310,6 @@ class PPOAgent:
         Returns
         -------
         episode_return : float
-        video_path     : pathlib.Path or None
         """
         obs_np, _ = env.reset()
         obs = torch.from_numpy(np.asarray(obs_np, dtype=np.float32)).to(self.device)
@@ -333,20 +329,7 @@ class PPOAgent:
                 self.device
             )
 
-            video_path: Path | None = None
-            # if hasattr(env, "video_recorder") and env.video_recorder is not None:
-            #     # Get path before closing
-            #     base_path = env.video_recorder.base_path
-            #     logger.info(f"Video base_path: {base_path}")
-            #     print(base_path)
-            #     video_path = Path(f"{base_path}.mp4")
-            #     print(video_path)
-
-            #     if not video_path.exists():
-            #         logger.warning(f"Expected video at {video_path} but not found")
-            #         video_path = None
-
-            return episode_return, video_path
+        return episode_return
 
     def train(self, train_envs):
         """
@@ -364,6 +347,9 @@ class PPOAgent:
 
         obs, _ = train_envs.reset()
         obs = torch.from_numpy(obs).to(self.device)
+
+        total_env_training_steps = 0
+        next_evaluation_at_step = EVAL_FREQUENCY_STEPS
 
         for update in range(1, n_updates + 1):
             # 1. Roll-out
@@ -460,18 +446,26 @@ class PPOAgent:
                 )
 
             # 7. Evaluation
-            if update % self.config.eval_interval == 0:
-                eval_env = make_eval_env(self.config, self.config.video_dir, seed=self.config.seed + update)
-                eval_ret, vid_path = self.evaluate(eval_env)
-
-                if self.wandb:
-                    log_data = {
-                        "eval/return": eval_ret,
-                        "global_step": update * steps_per_update,
-                    }
-                    if vid_path and vid_path.is_file():
-                        log_data["eval/video"] = wandb.Video(str(vid_path), fps=30)
-                    self.wandb.log(log_data)
+            # Increment total_env_training_steps
+            steps_this_update = self.config.horizon * self.config.num_envs
+            total_env_training_steps += steps_this_update
+            # Evaluation at fixed step intervals
+            if (
+                self.wandb
+                and total_env_training_steps >= next_evaluation_at_step
+            ):
+                eval_env = create_environment(self.config)
+                total_score = 0.0
+                for _ in range(3):
+                    # Evaluate multiple times to get a more stable average
+                    eval_ret, _ = self.evaluate(eval_env)
+                    total_score += eval_ret
+                eval_ret = total_score / 3.0
+                self.wandb.log({
+                    "eval/average_reward": eval_ret,
+                    "eval/total_training_steps": total_env_training_steps,
+                })
+                next_evaluation_at_step += EVAL_FREQUENCY_STEPS
 
             # 8. Checkpoint
             if update % self.config.checkpoint_interval == 0:
@@ -512,7 +506,6 @@ class PPOAgent:
             "final_model.pt",
         )
         return completed_returns
-
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create argument parser with PPOConfig defaults."""
@@ -577,7 +570,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
     # Logging & checkpointing
     p.add_argument("--seed", type=int, default=default.seed)
     p.add_argument("--log-interval", type=int, default=default.log_interval)
-    p.add_argument("--eval-interval", type=int, default=default.eval_interval)
     p.add_argument(
         "--checkpoint-interval", type=int, default=default.checkpoint_interval
     )
@@ -591,7 +583,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     return p
 
-
 def set_random_seeds(seed: int) -> None:
     """Set random seeds for reproducibility."""
     np.random.seed(seed)
@@ -600,35 +591,14 @@ def set_random_seeds(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
 def create_environment(config: PPOConfig, render_mode: Optional[str] = None):
     """Create and validate environment."""
     try:
         env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode)
-        print(f"Created environment with map: {config.map_name}")
         return env
     except Exception as e:
         logger.error(f"Failed to create environment: {e}")
         raise PPOError(f"Environment creation failed: {e}")
-
-
-def make_eval_env(config: PPOConfig, video_root: str, seed: int) -> gym.Env:
-    """
-    A single evaluation environment that records every episode to disk.
-    The video path for the most-recent episode is available via
-    env.video_recorder.last_video_path  (Gymnasium ≥ 0.29).
-    """
-    env = create_environment(config, render_mode="rgb_array")
-
-    env = RecordVideo(
-        env,
-        video_folder=video_root,
-        episode_trigger=lambda ep: True,
-        name_prefix="ppo_eval",
-        disable_logger=True,
-    )
-    return env
-
 
 def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.VectorEnv:
     """Return a SyncVectorEnv (1) or AsyncVectorEnv (≥2)."""
@@ -645,7 +615,6 @@ def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.Vect
     if num_envs == 1:
         return gym.vector.SyncVectorEnv(env_fns)
     return gym.vector.AsyncVectorEnv(env_fns)
-
 
 def main() -> None:
     """
@@ -690,7 +659,6 @@ def main() -> None:
 
     wandb_run.finish()
     train_envs.close()
-
 
 if __name__ == "__main__":
     try:
