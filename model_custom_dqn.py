@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import os
 import numpy as np
 
-
 class Linear_QNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
@@ -63,7 +62,6 @@ class Linear_QNetGen3(nn.Module):
             os.makedirs(model_folder_path, exist_ok=True)
         torch.save(self.state_dict(), file_name)
 
-
 class QTrainer:
     def __init__(self, model, lr, gamma):
         self.lr = lr
@@ -110,4 +108,3 @@ class QTrainer:
         loss.backward()
 
         self.optimizer.step()
-
