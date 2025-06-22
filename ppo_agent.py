@@ -72,13 +72,13 @@ class PPOConfig:
     seed: int = 0
     log_interval: int = 1  # updates between train logs
     checkpoint_interval: int = 20  # updates between checkpoints
-    patience: int = 5  # Number of consecutive windows without improvement before stopping
+    patience: int = 10  # Number of consecutive windows without improvement before stopping
     log_window: int = 100
 
     log_dir: str = "logs"
     checkpoint_dir: str = "checkpoints_ppo"
     video_dir: str = "videos"
-    map_name: str = "empty"
+    map_name: str = "default"
 
     def __post_init__(self):
         if self.total_timesteps < 1:
