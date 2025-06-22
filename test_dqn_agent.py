@@ -53,14 +53,14 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
     return total_reward, video_path
 
 def main():
-    map = "empty"
+    map = "default"
     trials = 50
     model_path = "checkpoints_dqn/model_final_model.pth"
     video_dir = f"videos/test_videos_dqn_{map}"
 
     Path(video_dir).mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    config = DQNConfig(map_name="empty")
+    config = DQNConfig(map_name=map)
     env = create_environment(config)
     agent = load_model(model_path, config, device)
     for i in range(1, trials + 1):
