@@ -201,7 +201,7 @@ def train(config: DQNConfig, wandb_run=None):
         # Target network update
         if episode % config.target_update_interval == 0:
             agent.update_target_network()
-            logger.info(f"Target network updated at episode {episode}")
+            # logger.info(f"Target network updated at episode {episode}")
         # Epsilon decay
         if episode % config.log_interval == 0:
             agent.epsilon = max(config.epsilon_end, agent.epsilon * config.epsilon_decay)
@@ -231,6 +231,7 @@ def train(config: DQNConfig, wandb_run=None):
         # Checkpointing
         if episode % config.checkpoint_interval == 0:
             logger.info(f"Saving checkpoint at episode {episode}")
+            logger.info(f"Current score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
             agent.save(f"ckpt_ep{episode}", run_id=run_id)
     agent.save('final_model', run_id=run_id)
     env.close()
