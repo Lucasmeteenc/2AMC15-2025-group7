@@ -17,8 +17,6 @@ NOISE_SIGMA = 0.01              # Gaussian noise on x,y after each move
 SENSE_RADIUS = 0.5 * SCALE      # radius to check whether pickup-/delivery-point is in range
 
 # Region rays
-NUM_REGIONS = 10                            # number of regions around the agent
-REGION_FOV = np.deg2rad(360/NUM_REGIONS)    # fov for each region
 MAX_LIDAR_DISTANCE = 2.0                    # max distance for each lidar ray region
 
 # Simulation parameters
@@ -55,8 +53,11 @@ class MediumDeliveryEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": FPS}
 
-    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=42):
+    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=42, nr_rays=1):
         super().__init__()
+        
+        self.NUM_REGIONS = nr_rays                            # number of regions around the agent
+        self.REGION_FOV = np.deg2rad(360/self.NUM_REGIONS)    # fov for each region
 
         # 1. Init state params
         self.agent_x:            float | None = None
@@ -97,9 +98,9 @@ class MediumDeliveryEnv(gym.Env):
 
         low = np.concatenate((
             np.array([0, 0, -1, -1, 0, 0,]),# 0, 0, 0, 0]),
-            np.zeros(NUM_REGIONS)
+            np.zeros(self.NUM_REGIONS)
         )).astype(np.float32)
-        high = np.ones(6+NUM_REGIONS, dtype=np.float32)
+        high = np.ones(6+self.NUM_REGIONS, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         # 7. RNG
@@ -453,9 +454,9 @@ class MediumDeliveryEnv(gym.Env):
                 segments.append((ax, ay, bx, by))
 
         # compute distances for each ray and select the closest intersection
-        distances = np.full(NUM_REGIONS, MAX_LIDAR_DISTANCE, dtype=np.float32)
-        for k in range(NUM_REGIONS):
-            theta = self.agent_theta + k * REGION_FOV
+        distances = np.full(self.NUM_REGIONS, MAX_LIDAR_DISTANCE, dtype=np.float32)
+        for k in range(self.NUM_REGIONS):
+            theta = self.agent_theta + k * self.REGION_FOV
             dx, dy = np.cos(theta), np.sin(theta)
             best = MAX_LIDAR_DISTANCE
             for ax, ay, bx, by in segments:
@@ -566,7 +567,7 @@ class MediumDeliveryEnv(gym.Env):
 
         # 8. Draw lidar rays as lines
         for k, d in enumerate(self._last_lidar):
-            angle = self.agent_theta + k * REGION_FOV
+            angle = self.agent_theta + k * self.REGION_FOV
             x2 = self.agent_x + d * np.cos(angle)
             y2 = self.agent_y + d * np.sin(angle)
             norm = d / MAX_LIDAR_DISTANCE
