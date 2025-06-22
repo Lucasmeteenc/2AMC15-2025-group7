@@ -345,7 +345,8 @@ class PPOAgent:
             #     if not video_path.exists():
             #         logger.warning(f"Expected video at {video_path} but not found")
             #         video_path = None
-        return episode_return, video_path
+
+            return episode_return, video_path
 
     def train(self, train_envs):
         """
@@ -462,7 +463,7 @@ class PPOAgent:
             if update % self.config.eval_interval == 0:
                 eval_env = make_eval_env(self.config, self.config.video_dir, seed=self.config.seed + update)
                 eval_ret, vid_path = self.evaluate(eval_env)
-                eval_env.close()
+
                 if self.wandb:
                     log_data = {
                         "eval/return": eval_ret,
