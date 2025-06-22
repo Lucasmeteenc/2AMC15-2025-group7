@@ -52,6 +52,7 @@ class DQNConfig:
     lr_decay_factor: float = 0.5        # Factor to multiply LR by
     lr_decay_episodes: int = 5000       # How often to decay LR (in episodes)
     min_learning_rate: float = 0.00001  # Minimum learning rate
+    checkpoint_interval: int = 2500     # Updates between checkpoints
 
 class DQNAgent:
     def __init__(self, observation_space, action_space, config: DQNConfig):
@@ -125,9 +126,12 @@ class DQNAgent:
     def update_target_network(self):
         self.target_model.load_state_dict(self.model.state_dict())
 
-    def save(self, name):
+    def save(self, name, run_id=None):
         Path(self.config.checkpoint_dir).mkdir(exist_ok=True)
-        file_name = f"{self.config.checkpoint_dir}/model_{name}.pth"
+        if run_id:
+            file_name = f"{self.config.checkpoint_dir}/model_{name}_{run_id}.pth"
+        else:
+            file_name = f"{self.config.checkpoint_dir}/model_{name}.pth"
         self.model.save(file_name=file_name)
         logger.info(f"Model saved to {file_name}")
 
@@ -140,8 +144,11 @@ def set_random_seeds(seed: int):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
 
-def create_environment(config: DQNConfig):
-    env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None)
+def create_environment(config: DQNConfig, seed=None):
+    if seed is not None:
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None, seed=seed)
+    else:
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None)
     return env
 
 def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
@@ -153,7 +160,6 @@ def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
         state, info = env.reset()
         done = False
         score = 0.0
-        done = False
         while not done:
             action = agent.get_action(state)
             state, reward, terminated, truncated, info = env.step(action)
@@ -166,16 +172,19 @@ def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
 
 def train(config: DQNConfig, wandb_run=None):
     set_random_seeds(config.seed)
-    env = create_environment(config)
+    env = create_environment(config, seed=config.seed)
+    eval_env = create_environment(config, seed=config.seed + 1)
     agent = DQNAgent(env.observation_space, env.action_space, config)
     state_old, _ = env.reset()
     cummulative_reward = 0
     total_env_training_steps = 0
     next_evaluation_at_step = EVAL_FREQUENCY_STEPS
+    run_id = None
+    if wandb_run is not None and hasattr(wandb_run, 'id'):
+        run_id = wandb_run.id
     for episode in range(1, config.total_episodes + 1):
         state_old, _ = env.reset()
         cummulative_reward = 0
-
         done = False
         while not done:
             action = agent.get_action(state_old)
@@ -187,35 +196,23 @@ def train(config: DQNConfig, wandb_run=None):
             state_old = state_new
             if terminated or truncated:
                 break
-        
         agent.n_game += 1
         current_batch_loss = agent.train_long_memory()
-
         # Target network update
         if episode % config.target_update_interval == 0:
             agent.update_target_network()
             logger.info(f"Target network updated at episode {episode}")
-        
         # Epsilon decay
         if episode % config.log_interval == 0:
             agent.epsilon = max(config.epsilon_end, agent.epsilon * config.epsilon_decay)
-
         # Learning Rate Scheduling Logic
         if episode > 0 and episode % config.lr_decay_episodes == 0:
-            # Get current learning rate
             current_lr = agent.trainer.optimizer.param_groups[0]['lr']
-            # Calculate new learning rate
             new_lr = current_lr * config.lr_decay_factor
-            # Apply new learning rate, ensuring it doesn't go below min_learning_rate
             updated_lr = max(new_lr, config.min_learning_rate)
-            
-            # Update the learning rate in the optimizer
             for param_group in agent.trainer.optimizer.param_groups:
                 param_group['lr'] = updated_lr
-            
-            logger.info(f"Episode {episode}: Learning rate decayed to {updated_lr:.7f}")
-        
-        logger.info(f"Episode {episode}, Score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
+        # logger.info(f"Episode {episode}, Score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
         if wandb_run:
             wandb_run.log({
                 "train/episode": episode,
@@ -223,18 +220,21 @@ def train(config: DQNConfig, wandb_run=None):
                 "train/epsilon": agent.epsilon,
                 "train/td_error": current_batch_loss
             })
-        
         # Evaluation with epsilon=0
         if total_env_training_steps >= next_evaluation_at_step and wandb_run:
-            eval_score = evaluate_policy(agent, env, config)
+            eval_score = evaluate_policy(agent, eval_env, config, n_episodes=10)
             wandb_run.log({
                 "eval/average_reward": eval_score,
                 "eval/total_training_steps": total_env_training_steps,
             })
             next_evaluation_at_step += EVAL_FREQUENCY_STEPS 
-
-    agent.save('final_model')
+        # Checkpointing
+        if episode % config.checkpoint_interval == 0:
+            logger.info(f"Saving checkpoint at episode {episode}")
+            agent.save(f"ckpt_ep{episode}", run_id=run_id)
+    agent.save('final_model', run_id=run_id)
     env.close()
+    eval_env.close()
     logger.info("Training completed.")
 
 def create_argument_parser():
