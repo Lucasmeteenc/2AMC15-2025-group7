@@ -458,7 +458,7 @@ class PPOAgent:
                 total_score = 0.0
                 for _ in range(3):
                     # Evaluate multiple times to get a more stable average
-                    eval_ret, _ = self.evaluate(eval_env)
+                    eval_ret = self.evaluate(eval_env)
                     total_score += eval_ret
                 eval_ret = total_score / 3.0
                 self.wandb.log({
