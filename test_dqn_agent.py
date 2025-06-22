@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from pathlib import Path
-import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
 from dqn_agent import DQNConfig, DQNAgent
 from environments.medium_delivery_env import MediumDeliveryEnv
@@ -55,7 +54,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
 
 def main():
     map = "empty"
-    trials = 10
+    trials = 50
     model_path = "checkpoints_dqn/model_final_model.pth"
     video_dir = f"videos/test_videos_dqn_{map}"
 
@@ -66,7 +65,7 @@ def main():
     agent = load_model(model_path, config, device)
     for i in range(1, trials + 1):
         total_reward, video_path = test_model(agent, env, device, video_dir, video_name=f"{map}_{i}")
-        print(f"Test episode reward: {total_reward}")
+        print(f"Test episode {i} reward: {total_reward}")
         if video_path:
             print(f"Video saved at: {video_path}")
 
