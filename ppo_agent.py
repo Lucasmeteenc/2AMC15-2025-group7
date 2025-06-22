@@ -351,6 +351,8 @@ class PPOAgent:
         total_env_training_steps = 0
         next_evaluation_at_step = EVAL_FREQUENCY_STEPS
 
+        eval_env = create_environment(self.config, seed=self.config.seed + 1)
+
         for update in range(1, n_updates + 1):
             # 1. Roll-out
             storage, last_values, obs = self.collect_rollout(train_envs, obs)
@@ -454,13 +456,13 @@ class PPOAgent:
                 self.wandb
                 and total_env_training_steps >= next_evaluation_at_step
             ):
-                eval_env = create_environment(self.config)
                 total_score = 0.0
-                for _ in range(3):
+                runs = 10
+                for _ in range(runs):
                     # Evaluate multiple times to get a more stable average
                     eval_ret = self.evaluate(eval_env)
                     total_score += eval_ret
-                eval_ret = total_score / 3.0
+                eval_ret = total_score / runs
                 self.wandb.log({
                     "eval/average_reward": eval_ret,
                     "eval/total_training_steps": total_env_training_steps,
@@ -468,6 +470,7 @@ class PPOAgent:
                 next_evaluation_at_step += EVAL_FREQUENCY_STEPS
 
             # 8. Checkpoint
+            run_id = self.wandb.id if self.wandb and hasattr(self.wandb, 'id') else "no_wandb"
             if update % self.config.checkpoint_interval == 0:
                 self.checkpoint_manager.save_checkpoint(
                     self.actor,
@@ -477,7 +480,7 @@ class PPOAgent:
                     update,
                     completed_returns,
                     self.config,
-                    f"ckpt_update{update}.pt",
+                    f"ckpt_update{update}_{run_id}.pt",
                 )
 
             # 9. Early Stopping
@@ -495,6 +498,7 @@ class PPOAgent:
                     break
 
         # final save
+        final_model_filename = f"final_model_{run_id}.pt"
         self.checkpoint_manager.save_checkpoint(
             self.actor,
             self.critic,
@@ -503,7 +507,7 @@ class PPOAgent:
             update,
             completed_returns,
             self.config,
-            "final_model.pt",
+            final_model_filename,
         )
         return completed_returns
 
@@ -591,10 +595,10 @@ def set_random_seeds(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def create_environment(config: PPOConfig, render_mode: Optional[str] = None):
+def create_environment(config: PPOConfig, seed: int, render_mode: Optional[str] = None):
     """Create and validate environment."""
     try:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode)
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode, seed=seed)
         return env
     except Exception as e:
         logger.error(f"Failed to create environment: {e}")
@@ -605,7 +609,7 @@ def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.Vect
 
     def _factory(rank: int):
         def _thunk():
-            env = create_environment(config, render_mode=None)
+            env = create_environment(config, seed=config.seed, render_mode=None)
             env.action_space.seed(seed + rank)
             return env
 
