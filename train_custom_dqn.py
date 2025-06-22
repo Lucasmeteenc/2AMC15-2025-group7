@@ -2,18 +2,18 @@ import torch
 import random
 import numpy as np
 from collections import deque
-from model_custom_dqn import Linear_QNetGen3, QTrainer
+from model_custom_dqn import Linear_QNet, Linear_QNetGen3, QTrainer
 from pathlib import Path
 import maps
-import maps_advanced
-
+# import maps_advanced
+from maps import MAIL_DELIVERY_MAPS
 # from environment2 import SimpleDeliveryEnv as Environment
-from environments.simple_delivery_env import SimpleDeliveryEnv as Environment
+from environments.medium_delivery_env_DQN import MediumDeliveryEnv as Environment
 
 np.set_printoptions(linewidth=np.inf)
-max_mem = 10_000
+max_mem = 100_000
 batch_size = 1000
-lr = 0.005
+lr = 0.00001
 
 class Agent:
     def __init__(self, observation_space, action_space):
@@ -21,18 +21,29 @@ class Agent:
         self.epsilon = 1.0
         self.gamma = 0.9  # <1
         self.memory = deque(maxlen=max_mem)
-        
+        # self.temp_memory = deque(maxlen=max_mem)
+
         self.observation_space = observation_space
         self.action_space = action_space
         self.action_size = action_space.n
         self.observation_size = observation_space.shape[0]
 
-        self.model = Linear_QNetGen3(self.observation_size, 128, self.action_size)
-        # self.model.load_state_dict(torch.load('models/Gen3/model218.pth'))
+        self.model = Linear_QNetGen3(self.observation_size, 512, self.action_size)
+        # self.model.load_state_dict(torch.load('models/Gen3/model17315.pth'))
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma)
 
     def remember(self, state, action, reward, next_state, done):
+        # self.temp_memory.append((state, action, reward, next_state, done))
         self.memory.append((state, action, reward, next_state, done))
+
+    # def full_remember(self):
+    #     for i in range(len(self.temp_memory)):
+    #         if i !=0:
+    #             mem_state = self.temp_memory[-(i+1)]
+    #             mem_reward = mem_state[2] + 0.95 * self.temp_memory[-i][2]
+    #             self.memory.append((mem_state[0], mem_state[1], mem_reward, mem_state[3], mem_state[4]))
+    #         else:
+    #             self.memory.append(self.temp_memory[-(i+1)])
 
     def train_long_memory(self):
         if len(self.memory) > batch_size:
@@ -69,13 +80,12 @@ def train():
     #     sigma=0.1,
     #     max_episode_steps=1000
     # )
-    
     # # No gui mode
     env = Environment(
-        render_mode='human',
+        # render_mode='human',
         # map_config=maps.MAIL_DELIVERY_MAPS['inside'],
-        map_config=maps_advanced.MAIL_DELIVERY_MAPS_ADVANCED['maze'],
-    ) 
+        map_config=MAIL_DELIVERY_MAPS['default'],
+    )
     
     agent = Agent(observation_space=env.observation_space, action_space=env.action_space) 
 
@@ -83,14 +93,17 @@ def train():
     state_old, info = env.reset()
     # env.render()
 
+    finished = 0
     old_reward = 0
-    cummulative_reward = 0
-    for i in range(1_000_000):
-        print(f"Step {i}, Epsilon: {agent.epsilon:.2f}")
-        if i % 100 == 0:
-            # print(i)
-            agent.epsilon = max(0.1, agent.epsilon * 0.98)
 
+    cummulative_reward = 0
+    for i in range(10_000_000):
+        # print(f"Step {i}, Epsilon: {agent.epsilon:.2f}")
+        if i % 10000 == 0:
+            # print(i)
+            agent.epsilon = max(0.1, agent.epsilon * 0.99)
+            # agent.epsilon = 0.1
+        # agent.epsilon = 0.1
         # get move
         final_move = agent.get_action(state_old)
 
@@ -112,17 +125,21 @@ def train():
             score = cummulative_reward
             cummulative_reward = 0
             if terminated:
+                finished+=1
                 print(f"Game ended with score: {score}")
             else:
                 print("Game truncated, max steps reached.")
+            print(finished)
             state_old, info = env.reset()
             agent.n_game += 1
+
+            # agent.full_remember()
             agent.train_long_memory()
 
             print(f'Game {agent.n_game}, Score: {score}, Epsilon: {agent.epsilon:.2f}')
-            if score > old_reward:
-                agent.model.save(file_name='model{}.pth'.format(score))
-                old_reward = score
+            # if score > old_reward:
+            agent.model.save(file_name='model{}.pth'.format(agent.n_game))
+                # old_reward = score
     env.close()
     
 if __name__ == '__main__':
