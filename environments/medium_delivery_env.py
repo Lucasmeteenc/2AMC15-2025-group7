@@ -53,7 +53,7 @@ class MediumDeliveryEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": FPS}
 
-    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=42, nr_rays=1):
+    def __init__(self, map_config: dict = MAIL_DELIVERY_MAPS["default"], render_mode=None, seed=42, nr_rays=10):
         super().__init__()
         
         self.NUM_REGIONS = nr_rays                            # number of regions around the agent
