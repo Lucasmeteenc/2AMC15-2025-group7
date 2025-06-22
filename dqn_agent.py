@@ -20,7 +20,7 @@ from model_custom_dqn import Linear_QNetGen2, QTrainer
 from environments.medium_delivery_env import MediumDeliveryEnv
 from maps import MAIL_DELIVERY_MAPS
 
-EVAL_FREQUENCY_STEPS = 10_000  # Frequency of evaluation in training steps
+EVAL_FREQUENCY_STEPS = 20_000  # Frequency of evaluation in training steps
 
 # Configure logging
 logging.basicConfig(
@@ -35,20 +35,23 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DQNConfig:
-    total_episodes: int = 10000
+    total_episodes: int = 15_000
     batch_size: int = 32
-    memory_size: int = 10000
-    learning_rate: float = 0.0005
+    memory_size: int = 100_000          # Increased from 50_000
+    learning_rate: float = 0.0001       # Decreased from 0.0005
     gamma: float = 0.99
     epsilon_start: float = 1.0
-    epsilon_end: float = 0.0
-    epsilon_decay: float = 0.9955
-    hidden_dim: int = 64
+    epsilon_end: float = 0.01
+    epsilon_decay: float = 0.997
+    hidden_dim: int = 256               # Increased from 64
     checkpoint_dir: str = "checkpoints_dqn"
     log_interval: int = 10
     seed: int = 0
     map_name: str = "default"
-    target_update_interval: int = 50
+    target_update_interval: int = 25
+    lr_decay_factor: float = 0.5        # Factor to multiply LR by
+    lr_decay_episodes: int = 5000       # How often to decay LR (in episodes)
+    min_learning_rate: float = 0.00001  # Minimum learning rate
 
 class DQNAgent:
     def __init__(self, observation_space, action_space, config: DQNConfig):
@@ -196,6 +199,21 @@ def train(config: DQNConfig, wandb_run=None):
         # Epsilon decay
         if episode % config.log_interval == 0:
             agent.epsilon = max(config.epsilon_end, agent.epsilon * config.epsilon_decay)
+
+        # Learning Rate Scheduling Logic
+        if episode > 0 and episode % config.lr_decay_episodes == 0:
+            # Get current learning rate
+            current_lr = agent.trainer.optimizer.param_groups[0]['lr']
+            # Calculate new learning rate
+            new_lr = current_lr * config.lr_decay_factor
+            # Apply new learning rate, ensuring it doesn't go below min_learning_rate
+            updated_lr = max(new_lr, config.min_learning_rate)
+            
+            # Update the learning rate in the optimizer
+            for param_group in agent.trainer.optimizer.param_groups:
+                param_group['lr'] = updated_lr
+            
+            logger.info(f"Episode {episode}: Learning rate decayed to {updated_lr:.7f}")
         
         logger.info(f"Episode {episode}, Score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
         if wandb_run:
