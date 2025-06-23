@@ -22,6 +22,10 @@ class NetworkFactory:
 
 
 class Actor(nn.Module):
+    """ 
+    Actor network for PPO.
+    Takes us input the current state and outputs a probability distribution over actions.
+    """
     def __init__(self, input_features: int, action_dim: int):
         super().__init__()
         self.backbone = nn.Sequential(
@@ -50,6 +54,11 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
+    """ 
+    Critic network for PPO.
+    Takes us input the state and return the value estimate for the given state.
+    Used to compute the value loss used in the advantage estimation.
+    """
     def __init__(self, input_dim: int):
         super().__init__()
         self.net = nn.Sequential(
