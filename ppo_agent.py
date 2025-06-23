@@ -261,8 +261,9 @@ class PPOAgent:
                 logits = self.actor(s_b)
                 dist = torch.distributions.Categorical(logits=logits)
                 logp = dist.log_prob(a_b)
-                entropy = dist.entropy().mean()
+                entropy = dist.entropy().mean() # entropy bonus for exploration
 
+                # clipped surrogate loss
                 ratio = torch.exp(logp - logp_old_b)
                 surr1 = ratio * adv_b
                 surr2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv_b
@@ -278,7 +279,7 @@ class PPOAgent:
 
                 # Forwardpass Critic
                 values = self.critic(s_b).squeeze(-1)
-                value_loss = F.mse_loss(values, ret_b)
+                value_loss = F.mse_loss(values, ret_b) # value function loss
 
                 self.critic_optimizer.zero_grad()
                 (self.config.value_coef * value_loss).backward()
