@@ -5,7 +5,6 @@ from collections import deque
 from model_custom_dqn import Linear_QNet, Linear_QNetGen3, QTrainer
 from pathlib import Path
 import maps
-# import maps_advanced
 from maps import MAIL_DELIVERY_MAPS
 # from environment2 import SimpleDeliveryEnv as Environment
 from environments.medium_delivery_env_DQN import MediumDeliveryEnv as Environment
