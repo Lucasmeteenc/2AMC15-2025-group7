@@ -36,19 +36,19 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DQNConfig:
     total_episodes: int = 15_000
-    batch_size: int = 32
-    memory_size: int = 100_000          # Increased from 50_000
+    batch_size: int = 64
+    memory_size: int = 200_000          # Increased from 50_000
     learning_rate: float = 0.0001       # Decreased from 0.0005
     gamma: float = 0.99
     epsilon_start: float = 1.0
     epsilon_end: float = 0.01
-    epsilon_decay: float = 0.997
+    epsilon_decay: float = 0.999
     hidden_dim: int = 256               # Increased from 64
     checkpoint_dir: str = "checkpoints_dqn"
     log_interval: int = 10
     seed: int = 0
     map_name: str = "default"
-    target_update_interval: int = 25
+    target_update_interval: int = 10
     lr_decay_factor: float = 0.5        # Factor to multiply LR by
     lr_decay_episodes: int = 5000       # How often to decay LR (in episodes)
     min_learning_rate: float = 0.00001  # Minimum learning rate
@@ -262,7 +262,7 @@ def main():
     args = parser.parse_args()
     config = DQNConfig(**vars(args))
     wandb_run = wandb.init(
-        project="medium-delivery-dqn",
+        project="medium-inside-delivery-dqn",
         name=f"DQN-{config.map_name}-{config.total_episodes}ep",
         config=config.__dict__,
         tags=["dqn", "gymnasium"],
