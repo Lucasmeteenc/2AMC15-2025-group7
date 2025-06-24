@@ -9,6 +9,9 @@
 .AppleDouble
 .LSOverride
 
+# checkpoint files
+checkpoints_dqn/model_ckpt_ep*
+
 # Auto encoder log
 /wandb/
 /models/
