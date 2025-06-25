@@ -366,6 +366,23 @@ class PPOAgent:
             actions = torch.stack([b["act"] for b in storage])
             states = torch.stack([b["obs"] for b in storage])
 
+            # Quick fix for mismatching dimensions in 1d
+            if n_envs == 1:
+                if rewards.dim() == 1:
+                    rewards = rewards.unsqueeze(1)
+                if dones.dim() == 1:
+                    dones = dones.unsqueeze(1)
+                if values.dim() == 1:
+                    values = values.unsqueeze(1)
+                if logp.dim() == 1:
+                    logp = logp.unsqueeze(1)
+                if actions.dim() == 1:
+                    actions = actions.unsqueeze(1)
+                if states.dim() == 2:
+                    states = states.unsqueeze(1)
+                if last_values.dim() == 0:
+                    last_values = last_values.unsqueeze(0)
+
             # 2. Advantage / return calculation
             if self.config.use_gae:
                 advantages, returns = self.advantage_calculator.calculate_gae(
