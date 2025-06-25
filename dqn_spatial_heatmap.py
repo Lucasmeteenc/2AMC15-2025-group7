@@ -25,7 +25,7 @@ MAIL_DELIVERY_MAPS = {
 }
 
 # Fixed starting position (hardcoded)
-FIXED_START_POSITION = (3.0, 1.0)  # Depot coordinates
+FIXED_START_POSITION = (8.0, 1.5)  # Depot coordinates
 
 SCALE = 1.0
 MAX_LIDAR_DISTANCE = 10.0
@@ -120,6 +120,12 @@ def evaluate_and_spatial_heatmap(model_path, map_name="default", trials=20, save
     
     # Render the map background
     render_map(ax, MAIL_DELIVERY_MAPS[map_name])
+
+    # Draw fixed start location
+    ax.add_patch(
+        Circle(FIXED_START_POSITION, 0.2 * SCALE, 
+               edgecolor='blue', facecolor='none', linewidth=2)
+    )
 
     # Overlay the heatmap using Kernel Density Estimation
     if positions:
