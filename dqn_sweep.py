@@ -62,4 +62,4 @@ def sweep_train():
 if __name__ == "__main__":
     sweep_config = get_sweep_config()
     sweep_id = wandb.sweep(sweep_config, project="medium-delivery-dqn-sweep")
-    wandb.agent(sweep_id, function=sweep_train)
+    wandb.agent('krldkgf3', function=sweep_train)

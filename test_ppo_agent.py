@@ -27,6 +27,7 @@ def test_model(actor, env, device: torch.device, video_dir: str):
     """Test the PPO model and save the video."""
     env = RecordVideo(env, video_folder=video_dir, episode_trigger=lambda ep: True, name_prefix="ppo_test")
     obs_np, _ = env.reset()
+    video_name = env._video_name
     obs = torch.from_numpy(np.asarray(obs_np, dtype=np.float32)).to(device)
 
     total_reward = 0.0
@@ -42,14 +43,7 @@ def test_model(actor, env, device: torch.device, video_dir: str):
         obs = torch.from_numpy(np.asarray(next_obs_np, dtype=np.float32)).to(device)
 
     # Retrieve video path
-    video_path = None
-    if hasattr(env, "video_recorder") and env.video_recorder is not None:
-        base_path = env.video_recorder.base_path
-        video_path = Path(f"{base_path}.mp4")
-        if not video_path.exists():
-            print(f"Expected video at {video_path} but not found")
-            video_path = None
-
+    video_path = Path(video_dir) / f"{video_name}.mp4"
     env.close()
     return total_reward, video_path
 

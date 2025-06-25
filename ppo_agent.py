@@ -52,17 +52,17 @@ class PPOConfig:
     num_envs: int = 8  # N  (parallel envs)
 
     # Architecture
-    hidden_dim: int = 64
+    hidden_dim: int = 128
 
     # optimization
-    learning_rate: float = 3e-4  # Adam
+    learning_rate: float = 1e-3  # Adam
     batch_size: int = 64  # per SGD minibatch
     n_epochs: int = 10  # PPO epochs per update
 
-    clip_range: float = 0.2  # ε in clipped objective
+    clip_range: float = 0.1  # ε in clipped objective
     gamma: float = 0.99  # discount
-    gae_lambda: float = 0.95  # λ for GAE
-    value_coef: float = 0.5  # c1
+    gae_lambda: float = 0.9  # λ for GAE
+    value_coef: float = 1  # c1
     entropy_coef: float = 0.0  # c2
     max_grad_norm: float = 0.5  # global grad-clip
 
@@ -71,7 +71,7 @@ class PPOConfig:
     # Rest
     seed: int = 0
     log_interval: int = 1  # updates between train logs
-    checkpoint_interval: int = 20  # updates between checkpoints
+    checkpoint_interval: int = 1  # updates between checkpoints
     patience: int = 10  # Number of consecutive windows without improvement before stopping
     log_window: int = 100
 
@@ -632,7 +632,7 @@ def main() -> None:
     config = PPOConfig(**vars(args))
 
     wandb_run = wandb.init(
-        project="medium-delivery-ppo",
+        project="medium-inside-delivery-ppo",
         name=f"PPO-{config.num_envs}envs-{config.horizon}T",
         config=config.__dict__,
         tags=["ppo", "gymnasium"],

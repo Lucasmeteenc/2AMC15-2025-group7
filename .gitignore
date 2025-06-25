@@ -9,6 +9,10 @@
 .AppleDouble
 .LSOverride
 
+# checkpoint files
+checkpoints_dqn/model_ckpt_ep*
+checkpoints_ppo/ckpt_update*
+
 # Auto encoder log
 /wandb/
 /models/
@@ -252,4 +256,3 @@ test.ipynb
 
 videos/
 logs/
-*.pt
