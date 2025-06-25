@@ -27,6 +27,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
         env = RecordVideo(env, video_folder=video_dir, episode_trigger=lambda ep: True, 
                           name_prefix=video_name if video_name else "dqn_test")
     obs_np, _ = env.reset()
+    video_name = env._video_name
     print(f"Observation space: x-{obs_np[0]:.4f}, y-{obs_np[1]:.4f}")
     done = False
     total_reward = 0.0
@@ -43,12 +44,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
         total_reward += reward
         obs_np = next_obs_np
     # Retrieve video path
-    video_path = None
-    if hasattr(env, "video_recorder") and env.video_recorder is not None:
-        video_path = Path(env.video_recorder.path)
-        if not video_path.exists():
-            print(f"Expected video at {video_path} but not found")
-            video_path = None
+    video_path = Path(video_dir) / f"{video_name}.mp4"
     env.close()
     return total_reward, video_path
 
