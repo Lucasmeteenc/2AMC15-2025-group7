@@ -332,10 +332,11 @@ class PPOAgent:
 
         return episode_return
 
-    def train(self, train_envs):
+    def train(self, train_envs, save_update=True):
         """
         Main PPO training loop (vectorised environments, fixed-horizon roll-outs).
         - envs : vectorised training environments (n_envs)
+        - save_update : whether to save the model after each update
         """
         horizon = self.config.horizon
         n_envs = self.config.num_envs
@@ -489,7 +490,7 @@ class PPOAgent:
 
             # 8. Checkpoint
             run_id = self.wandb.id if self.wandb and hasattr(self.wandb, 'id') else "no_wandb"
-            if update % self.config.checkpoint_interval == 0:
+            if save_update and update % self.config.checkpoint_interval == 0:
                 self.checkpoint_manager.save_checkpoint(
                     self.actor,
                     self.critic,

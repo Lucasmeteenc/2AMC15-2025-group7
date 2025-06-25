@@ -28,7 +28,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
                           name_prefix=video_name if video_name else "dqn_test")
     obs_np, _ = env.reset()
     video_name = env._video_name
-    print(f"Observation space: x-{obs_np[0]:.4f}, y-{obs_np[1]:.4f}")
+    # print(f"Observation space: x-{obs_np[0]:.4f}, y-{obs_np[1]:.4f}")
     done = False
     total_reward = 0.0
     agent.epsilon = 0.0  # Greedy policy
