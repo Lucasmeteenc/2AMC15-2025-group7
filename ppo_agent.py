@@ -481,7 +481,7 @@ class PPOAgent:
                     update,
                     completed_returns,
                     self.config,
-                    f"ckpt_update{update}_{run_id}.pt",
+                    f"ckpt_update{update}_{run_id}.pth",
                 )
 
             # 9. Early Stopping
@@ -499,7 +499,7 @@ class PPOAgent:
                     break
 
         # final save
-        final_model_filename = f"final_model_{run_id}.pt"
+        final_model_filename = f"final_model_{run_id}.pth"
         self.checkpoint_manager.save_checkpoint(
             self.actor,
             self.critic,

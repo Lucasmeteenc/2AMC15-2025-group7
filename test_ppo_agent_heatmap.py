@@ -72,7 +72,7 @@ def evaluate_and_heatmap(model_path, map_name="default", trials=20, save_path="h
 
 if __name__ == "__main__":
     evaluate_and_heatmap(
-        model_path="final_model_cb3tpg9d.pt",
+        model_path="final_model_cb3tpg9d.pth",
         map_name="default",
         trials=5,
         save_path="ppo_agent_heatmap.png"

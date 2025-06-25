@@ -50,7 +50,7 @@ def test_model(actor, env, device: torch.device, video_dir: str):
 def main():
     map = "default"
     trials = 10
-    model_path = "checkpoints_ppo/final_model_default.pt"
+    model_path = "checkpoints_ppo/final_model_default.pth"
     video_dir = f"videos/test_videos_ppo_{map}"
     Path(video_dir).mkdir(parents=True, exist_ok=True)
 

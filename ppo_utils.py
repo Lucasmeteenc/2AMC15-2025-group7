@@ -101,7 +101,7 @@ class CheckpointManager:
     ) -> str:
         """Save model checkpoint."""
         if filepath is None:
-            filepath = self.checkpoint_dir / f"checkpoint_ep{episode}.pt"
+            filepath = self.checkpoint_dir / f"checkpoint_ep{episode}.pth"
         else: 
             filepath = self.checkpoint_dir / filepath
 
