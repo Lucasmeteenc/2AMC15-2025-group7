@@ -144,11 +144,11 @@ def set_random_seeds(seed: int):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
 
-def create_environment(config: DQNConfig, seed=None):
+def create_environment(config: DQNConfig, seed=None, render_mode=None):
     if seed is not None:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None, seed=seed)
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode, seed=seed)
     else:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=None)
+        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode)
     return env
 
 def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
