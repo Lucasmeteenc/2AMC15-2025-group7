@@ -24,6 +24,9 @@ MAIL_DELIVERY_MAPS = {
     },
 }
 
+# Fixed starting position (hardcoded)
+FIXED_START_POSITION = (3.0, 1.0)  # Depot coordinates
+
 SCALE = 1.0
 MAX_LIDAR_DISTANCE = 10.0
 
@@ -85,6 +88,8 @@ def evaluate_and_spatial_heatmap(model_path, map_name="default", trials=20, save
 
     for episode in range(trials):
         obs_np, _ = env.reset()
+        env.agent_x, env.agent_y = FIXED_START_POSITION
+        
         done = False
         step_count = 0
         total_score = 0
@@ -143,7 +148,7 @@ def evaluate_and_spatial_heatmap(model_path, map_name="default", trials=20, save
 
 if __name__ == "__main__":
     # In a real scenario, this would be a pre-trained model file.
-    model_path = "checkpoints_dqn/model_final_model_d9tr8v60.pth"
+    model_path = "checkpoints_dqn/model_final_model_15rngm8u.pth"
     if not Path(model_path).exists():
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
         # This part assumes DQNConfig and DQNAgent are defined elsewhere
