@@ -16,7 +16,7 @@ from maps import MAIL_DELIVERY_MAPS
 # --------------------------------------------------------------------------- #
 # Configuration constants
 # --------------------------------------------------------------------------- #
-FIXED_START_POSITION = (8.0, 4.0)   # depot coordinates
+FIXED_START_POSITION = (9.0, 4.0)   # depot coordinates
 FIXED_START_THETA = 0
 SCALE                 = 1.0
 
@@ -42,6 +42,16 @@ def render_map(ax, map_config):
                             depot_y - 0.2 * SCALE),
                            0.4 * SCALE, 0.4 * SCALE,
                            color="green"))
+    
+    # mark the fixed start position with a small blue circle
+    start_x, start_y = FIXED_START_POSITION
+    ax.plot(start_x, start_y,
+            marker='o',
+            markersize=6,     # smaller than depot square
+            color='lightblue',
+            # zorder=10,        # ensure it sits on top
+            label='Start')
+
     # Delivery point (red X)
     deliv_x, deliv_y = map_config["delivery"]
     off = 0.2 * SCALE
@@ -142,7 +152,7 @@ def evaluate_and_spatial_heatmap(model_path: str,
                     n_levels=100,
                     bw_adjust=bandwidth,
                     ax=ax)
-
+        
     ax.set_xlabel(""); ax.set_ylabel("")
     ax.set_title(f"DQN Agent Continuous Spatial Heat-map ({trials} episodes)")
     plt.tight_layout()
