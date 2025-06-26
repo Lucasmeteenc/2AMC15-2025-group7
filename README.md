@@ -4,6 +4,63 @@ The algorithms that were implemented are:
 1. DQN
 2. PPO
 
+## Requirements
+
+Install dependencies from `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+
+# Demonstration
+
+The `demonstration.py` script provides a step-by-step walkthrough of our environment, maps, and trained agents. It highlights both testing and training workflows for our PPO and DQN models.
+
+## Features
+`demonstration.py` has several section in the code enabling you to see the following:
+
+1. **Environment Visualization + Agent Performance showcase**
+
+    * Demonstrate enviornment, lidar ray interacion and robot's action.
+   * See our optimal pre-trained PPO and DQN agents
+   * Change agent and map (see the comments in the file on how to do so)
+
+3. **Interactive Training Demos**
+
+   * Execute training loops for PPO and DQN agents directly within the script.
+   * Due to shortened training epochs (for demonstration purposes), you will see agents on their way to learning optimal paths, though not yet fully converged.
+
+4. **Video Recording**
+
+   * Automatically saves demo videos to the `/demo_videos/` directory (and it's respective sub folder).
+   * Terminal output indicates the file path for each recording.
+
+## Usage
+
+### Interactive Mode
+
+The script is organized into cell blocks (marked with `# %%`), allowing you to run sections independently in an interactive IDE (e.g., Visual Studio Code).
+
+* **Step 1:** Open `demonstration.py` in VS Code.
+* **Step 2:** Execute individual cells (`# %%`) to:
+
+  * Observe pre-trained agents on enviornment.
+  * Train PPO/DQN agents.
+  * Play back recorded videos.
+
+Most cells can be run standalone in any order. However, the first two cells must always be executed to initialize the environment and dependencies. For best results, we recommend following the file’s linear execution order.
+
+### Command-Line Mode
+
+To run the full demonstration end-to-end and record videos, use:
+
+```bash
+python demonstration.py
+```
+
+The script will print the paths of the saved videos and also print additional information.
+
 
 # Spatial Heatmap Visualization
 
@@ -12,11 +69,6 @@ Two nearly identical scripts for visualizing agent trajectories as continuous sp
 - **dqn_spatial_heatmap.py**: uses a pre‐trained DQN agent.  
 - **ppo_spatial_heatmap.py**: uses a pre‐trained PPO agent.
 Both scripts share the same interface and differ only in the RL algorithm and default KDE settings.
-
-## Requirements
-- matplotlib  
-- seaborn  
-- (plus any dependencies of `dqn_agent`, `ppo_agent`, and `environments/medium_delivery_env`)
 
 ## Usage
 ```bash
