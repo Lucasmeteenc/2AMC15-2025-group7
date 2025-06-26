@@ -2,6 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 import warnings
+import os
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -17,8 +18,10 @@ from maps import MAIL_DELIVERY_MAPS
 # --------------------------------------------------------------------------- #
 # Configuration constants
 # --------------------------------------------------------------------------- #
-FIXED_START_POSITION = (9.0, 4.0)  # Same interesting coords as DQN version
-FIXED_START_THETA = 0
+# for experiments: (9.0,4.0),(0.5,9.0),(1.0,2.0)
+# for inside map: (5.0,2.0),(1.0,9.0),(1.0,1.0)
+FIXED_START_POSITION = (1.0, 1.0)  # interesting coords for default: (9.0, 4.0), theta=0
+FIXED_START_THETA = 0              #                        inside: (5.0, 2.0), theta=0
 SCALE = 1.0  # Scale factor for marker sizes
 
 # --------------------------------------------------------------------------- #
@@ -169,13 +172,14 @@ def evaluate_and_spatial_heatmap(
             ax=ax,
         )
 
+    final_path = os.path.join("sheatmap_results",save_path)
     ax.set_xlabel("")
     ax.set_ylabel("")
     ax.set_title(f"PPO Agent Continuous Spatial Heat-map ({trials} episodes)")
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(final_path, dpi=300)
     plt.close()
-    logging.info("Spatial heat-map saved to %s", save_path)
+    logging.info("Spatial heat-map saved to %s", final_path)
 
 
 # --------------------------------------------------------------------------- #
