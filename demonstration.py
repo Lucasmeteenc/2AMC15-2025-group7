@@ -14,10 +14,10 @@ import torch
 from IPython.display import Video  # For displaying videos in interactive window (e.g. Jupyter Notebook)
 
 import dqn_agent
-import test_dqn_agent
+import dqn_test
 
 import ppo_agent
-import test_ppo_agent  
+import ppo_test  
 
 BEST_MODELS_DIR = 'best_models'  # Directory where the best models are saved
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise CPU
@@ -50,14 +50,14 @@ def demo_best_agent_on_map(algorithm, map_name, video_dir='demo_videos', device=
     
     # Load and test the model
     if algorithm == 'ppo':
-        actor = test_ppo_agent.load_model(checkpoint_path, env.observation_space.shape[0], env.action_space.n, device) 
+        actor = ppo_test.load_model(checkpoint_path, env.observation_space.shape[0], env.action_space.n, device) 
         ppo_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
-        total_reward, video_path = test_ppo_agent.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
+        total_reward, video_path = ppo_test.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
     else:
-        config = test_dqn_agent.DQNConfig(map_name=map_name)
-        actor = test_dqn_agent.load_model(checkpoint_path, config, device)
+        config = dqn_test.DQNConfig(map_name=map_name)
+        actor = dqn_test.load_model(checkpoint_path, config, device)
         ppo_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
-        total_reward, video_path = test_dqn_agent.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
+        total_reward, video_path = dqn_test.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
 
     # Test the model
     print(f"Total reward: {total_reward}")
@@ -133,7 +133,7 @@ print(f"Training complete. Results saved to {checkpoint_dir}")
 ###
 # Load the trained model from the code above
 print(f"Loading DQN model from {f'demo_videos/checkpoints_dqn/{map_name}/model_final_model.pth'}")
-actor = test_dqn_agent.load_model(
+actor = dqn_test.load_model(
     model_path=f'demo_videos/checkpoints_dqn/{map_name}/model_final_model.pth',
     config=dqn_agent.DQNConfig(map_name=map_name, seed=FIXED_SEED),
     device=DEVICE
@@ -146,7 +146,7 @@ video_dir = f'demo_videos/dqn_demo_{map_name}'  # Directory to save the video
 
 # Test the model
 print(f"Testing DQN agent on map '{map_name}'...")
-total_reward, video_path = test_dqn_agent.test_model(
+total_reward, video_path = dqn_test.test_model(
     actor,
     env,
     device=DEVICE,
@@ -207,7 +207,7 @@ print(f"Training complete. Results saved to {config.checkpoint_dir}")
 ###
 # Load the trained model from the code above
 print(f"Loading PPO model from {f'demo_videos/checkpoints_ppo/{map_name}/final_model_{map_name}.pth'}")
-actor = test_ppo_agent.load_model(
+actor = ppo_test.load_model(
     model_path=f'demo_videos/checkpoints_ppo/{map_name}/final_model_no_wandb.pth',
     state_size=state_space_size,
     action_size=action_space_size,
@@ -224,7 +224,7 @@ env = Environment(
 print(f"Testing PPO agent on map '{map_name}'")
 video_dir = f'demo_videos/ppo_demo_{map_name}'  # Directory to save the video
 # Test the model
-total_reward, video_path = test_ppo_agent.test_model(
+total_reward, video_path = ppo_test.test_model(
     actor,
     env,
     device=DEVICE,
