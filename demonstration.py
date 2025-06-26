@@ -19,6 +19,9 @@ import dqn_test
 import ppo_agent
 import ppo_test  
 
+import sys
+sys.modules['__main__'].PPOConfig = ppo_agent.PPOConfig
+
 BEST_MODELS_DIR = 'best_models'  # Directory where the best models are saved
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise CPU
 FIXED_SEED = 42 
@@ -81,7 +84,7 @@ Video(video_path, embed=True, width=800, height=600) if video_path else None
 # Map 2 inside 
 # DQN Agent
 map_name = 'inside' # Options: 'default' or 'inside'
-algorithm = 'dqn'  # Options: 'dqn' or 'ppo'
+algorithm = 'ppo'  # Options: 'dqn' or 'ppo'
 
 # Test model
 video_path, best_actor = demo_best_agent_on_map(algorithm, map_name, video_dir='demo_videos', device=DEVICE)
