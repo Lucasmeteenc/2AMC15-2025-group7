@@ -28,12 +28,12 @@ python ppo_spatial_heatmap.py [--model PATH] [--map NAME] [--trials N]
 ```
 
 ## Arguments
-`--model`: path to your `.pth` file
-`--map`: one of the keys in `MAIL_DELIVERY_MAPS`
-`--trials`: number of episodes (default: 100)
-`--bw`: KDE bandwidth adjust (DQN default 0.3, PPO default 0.5)
-`--cmap`: matplotlib colormap (e.g. `viridis`, `magma`)
-`--out`: output PNG filename
+`--model`: path to your `.pth` file<br>
+`--map`: one of the keys in `MAIL_DELIVERY_MAPS`<br>
+`--trials`: number of episodes (default: 100)<br>
+`--bw`: KDE bandwidth adjust (DQN default 0.3, PPO default 0.5)<br>
+`--cmap`: matplotlib colormap (e.g. `viridis`, `magma`)<br>
+`--out`: output PNG filename<br>
 `-v`: verbose logging
 
 ## Output
