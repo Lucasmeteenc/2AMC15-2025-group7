@@ -78,6 +78,7 @@ class QTrainer:
             next_state = np.array(next_state)
             action = np.array(action)
             reward = np.array(reward)
+            
         Q_new = 0
         state = torch.tensor(state, dtype=torch.float)
         next_state = torch.tensor(next_state, dtype=torch.float)
