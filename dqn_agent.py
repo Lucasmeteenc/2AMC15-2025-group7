@@ -7,7 +7,6 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass
-from typing import Optional
 from pathlib import Path
 
 import numpy as np

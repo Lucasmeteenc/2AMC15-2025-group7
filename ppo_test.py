@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from pathlib import Path
-import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
 from ppo_network import NetworkFactory
 from environments.medium_delivery_env import MediumDeliveryEnv
