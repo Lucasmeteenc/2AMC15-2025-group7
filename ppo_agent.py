@@ -172,7 +172,9 @@ class PPOAgent:
             logger.error(f"Failed to setup networks: {e}")
             raise PPOError(f"Network setup failed: {e}")
 
-    def collect_rollout(self, envs, obs):
+    def collect_rollout(
+            self, envs: gym.vector.VectorEnv, obs: torch.Tensor
+    ) -> Tuple[list[dict], torch.Tensor, torch.Tensor]:
         """
         Collect `self.horizon` steps from `n_envs` vectorised environments.
         Returns a dict ready for GAE and PPO updates.
@@ -335,7 +337,7 @@ class PPOAgent:
 
         return episode_return
 
-    def train(self, train_envs, save_update=True):
+    def train(self, train_envs: gym.vector.VectorEnv, save_update: bool = True) -> list[float]:
         """
         Main PPO training loop (vectorised environments, fixed-horizon roll-outs).
         - envs : vectorised training environments (n_envs)
@@ -623,7 +625,7 @@ def set_random_seeds(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
-def create_environment(config: PPOConfig, seed: int, render_mode: Optional[str] = None):
+def create_environment(config: PPOConfig, seed: int, render_mode: Optional[str] = None) -> MediumDeliveryEnv:
     """Create and validate environment."""
     try:
         env = MediumDeliveryEnv(
