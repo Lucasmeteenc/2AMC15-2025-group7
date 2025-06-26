@@ -32,26 +32,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class DQNConfig:
     total_episodes: int = 15_000
     batch_size: int = 64
-    memory_size: int = 200_000          # Increased from 50_000
-    learning_rate: float = 0.0001       # Decreased from 0.0005
+    memory_size: int = 200_000  # Increased from 50_000
+    learning_rate: float = 0.0001  # Decreased from 0.0005
     gamma: float = 0.99
     epsilon_start: float = 1.0
     epsilon_end: float = 0.01
     epsilon_decay: float = 0.999
-    hidden_dim: int = 256               # Increased from 64
+    hidden_dim: int = 256  # Increased from 64
     checkpoint_dir: str = "checkpoints_dqn"
     log_interval: int = 10
     seed: int = 0
     map_name: str = "default"
     target_update_interval: int = 10
-    lr_decay_factor: float = 0.5        # Factor to multiply LR by
-    lr_decay_episodes: int = 5000       # How often to decay LR (in episodes)
+    lr_decay_factor: float = 0.5  # Factor to multiply LR by
+    lr_decay_episodes: int = 5000  # How often to decay LR (in episodes)
     min_learning_rate: float = 0.00001  # Minimum learning rate
-    checkpoint_interval: int = 2500     # Updates between checkpoints
+    checkpoint_interval: int = 2500  # Updates between checkpoints
+
 
 class DQNAgent:
     def __init__(self, observation_space, action_space, config: DQNConfig):
@@ -63,8 +65,12 @@ class DQNAgent:
         self.action_space = action_space
         self.action_size = action_space.n
         self.observation_size = observation_space.shape[0]
-        self.model = Linear_QNetGen2(self.observation_size, config.hidden_dim, self.action_size)
-        self.target_model = Linear_QNetGen2(self.observation_size, config.hidden_dim, self.action_size)  # Target network
+        self.model = Linear_QNetGen2(
+            self.observation_size, config.hidden_dim, self.action_size
+        )
+        self.target_model = Linear_QNetGen2(
+            self.observation_size, config.hidden_dim, self.action_size
+        )  # Target network
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
         self.trainer = QTrainer(self.model, lr=config.learning_rate, gamma=self.gamma)
@@ -79,11 +85,15 @@ class DQNAgent:
         else:
             mini_sample = self.memory
         states, actions, rewards, next_states, done = zip(*mini_sample)
-        batch_loss = self._train_step_with_target(states, actions, rewards, next_states, done)
+        batch_loss = self._train_step_with_target(
+            states, actions, rewards, next_states, done
+        )
         return batch_loss
 
     def train_short_memory(self, state, action, reward, next_state, done):
-        _ = self._train_step_with_target([state], [action], [reward], [next_state], [done])
+        _ = self._train_step_with_target(
+            [state], [action], [reward], [next_state], [done]
+        )
 
     def _train_step_with_target(self, states, actions, rewards, next_states, done):
         # Use target network for next_state Q-values
@@ -134,6 +144,7 @@ class DQNAgent:
         self.model.save(file_name=file_name)
         logger.info(f"Model saved to {file_name}")
 
+
 def set_random_seeds(seed: int):
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -143,12 +154,20 @@ def set_random_seeds(seed: int):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
 
+
 def create_environment(config: DQNConfig, seed=None, render_mode=None):
     if seed is not None:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode, seed=seed)
+        env = MediumDeliveryEnv(
+            map_config=MAIL_DELIVERY_MAPS[config.map_name],
+            render_mode=render_mode,
+            seed=seed,
+        )
     else:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode)
+        env = MediumDeliveryEnv(
+            map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode
+        )
     return env
+
 
 def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
     """Evaluate agent with epsilon=0 (greedy policy) and return average score."""
@@ -169,6 +188,7 @@ def evaluate_policy(agent, env, config: DQNConfig, n_episodes: int = 3):
     agent.epsilon = original_epsilon
     return total_score / n_episodes
 
+
 def train(config: DQNConfig, wandb_run=None):
     set_random_seeds(config.seed)
     env = create_environment(config, seed=config.seed)
@@ -179,7 +199,7 @@ def train(config: DQNConfig, wandb_run=None):
     total_env_training_steps = 0
     next_evaluation_at_step = EVAL_FREQUENCY_STEPS
     run_id = None
-    if wandb_run is not None and hasattr(wandb_run, 'id'):
+    if wandb_run is not None and hasattr(wandb_run, "id"):
         run_id = wandb_run.id
     for episode in range(1, config.total_episodes + 1):
         state_old, _ = env.reset()
@@ -203,39 +223,48 @@ def train(config: DQNConfig, wandb_run=None):
             # logger.info(f"Target network updated at episode {episode}")
         # Epsilon decay
         if episode % config.log_interval == 0:
-            agent.epsilon = max(config.epsilon_end, agent.epsilon * config.epsilon_decay)
+            agent.epsilon = max(
+                config.epsilon_end, agent.epsilon * config.epsilon_decay
+            )
         # Learning Rate Scheduling Logic
         if episode > 0 and episode % config.lr_decay_episodes == 0:
-            current_lr = agent.trainer.optimizer.param_groups[0]['lr']
+            current_lr = agent.trainer.optimizer.param_groups[0]["lr"]
             new_lr = current_lr * config.lr_decay_factor
             updated_lr = max(new_lr, config.min_learning_rate)
             for param_group in agent.trainer.optimizer.param_groups:
-                param_group['lr'] = updated_lr
+                param_group["lr"] = updated_lr
         # logger.info(f"Episode {episode}, Score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
         if wandb_run:
-            wandb_run.log({
-                "train/episode": episode,
-                "train/score": cummulative_reward,
-                "train/epsilon": agent.epsilon,
-                "train/td_error": current_batch_loss
-            })
+            wandb_run.log(
+                {
+                    "train/episode": episode,
+                    "train/score": cummulative_reward,
+                    "train/epsilon": agent.epsilon,
+                    "train/td_error": current_batch_loss,
+                }
+            )
         # Evaluation with epsilon=0
         if total_env_training_steps >= next_evaluation_at_step and wandb_run:
             eval_score = evaluate_policy(agent, eval_env, config, n_episodes=10)
-            wandb_run.log({
-                "eval/average_reward": eval_score,
-                "eval/total_training_steps": total_env_training_steps,
-            })
-            next_evaluation_at_step += EVAL_FREQUENCY_STEPS 
+            wandb_run.log(
+                {
+                    "eval/average_reward": eval_score,
+                    "eval/total_training_steps": total_env_training_steps,
+                }
+            )
+            next_evaluation_at_step += EVAL_FREQUENCY_STEPS
         # Checkpointing
         if episode % config.checkpoint_interval == 0:
             logger.info(f"Saving checkpoint at episode {episode}")
-            logger.info(f"Current score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}")
+            logger.info(
+                f"Current score: {cummulative_reward}, Epsilon: {agent.epsilon:.2f}"
+            )
             agent.save(f"ckpt_ep{episode}", run_id=run_id)
-    agent.save('final_model', run_id=run_id)
+    agent.save("final_model", run_id=run_id)
     env.close()
     eval_env.close()
     logger.info("Training completed.")
+
 
 def create_argument_parser():
     p = argparse.ArgumentParser(description="DQN Training Configuration")
@@ -268,6 +297,7 @@ def main():
     )
     train(config, wandb_run)
     wandb_run.finish()
+
 
 if __name__ == "__main__":
     try:

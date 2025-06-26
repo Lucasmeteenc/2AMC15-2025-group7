@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class PPOError(Exception):
     """Custom exception for PPO-related errors."""
+
     pass
 
 
@@ -74,7 +75,7 @@ class AdvantageCalculator:
 
         returns = advantages + values  # V-targets
         return advantages, returns
-    
+
     @staticmethod
     def flatten_time_env(tensor: torch.Tensor) -> torch.Tensor:
         """Collapse (time, env) into batch dimension."""
@@ -102,7 +103,7 @@ class CheckpointManager:
         """Save model checkpoint."""
         if filepath is None:
             filepath = self.checkpoint_dir / f"checkpoint_ep{episode}.pth"
-        else: 
+        else:
             filepath = self.checkpoint_dir / filepath
 
         try:

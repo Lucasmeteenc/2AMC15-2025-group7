@@ -72,7 +72,9 @@ class PPOConfig:
     seed: int = 0
     log_interval: int = 1  # updates between train logs
     checkpoint_interval: int = 1  # updates between checkpoints
-    patience: int = 10  # Number of consecutive windows without improvement before stopping
+    patience: int = (
+        10  # Number of consecutive windows without improvement before stopping
+    )
     log_window: int = 100
 
     log_dir: str = "logs"
@@ -92,6 +94,7 @@ class PPOConfig:
         if not (0.0 < self.learning_rate):
             raise ValueError("learning_rate must be positive")
 
+
 class PPOAgent:
     """Main PPO agent class that orchestrates training and evaluation."""
 
@@ -108,9 +111,9 @@ class PPOAgent:
         self.checkpoint_manager = CheckpointManager(config.checkpoint_dir)
         self.metrics_logger = MetricsLogger(config.log_dir)
         self.advantage_calculator = AdvantageCalculator()
-        
+
         # Initialize best average return
-        self.best_avg_return = float('-inf')
+        self.best_avg_return = float("-inf")
         # Counter for epochs without improvement
         self.epochs_without_improvement = 0
 
@@ -261,7 +264,7 @@ class PPOAgent:
                 logits = self.actor(s_b)
                 dist = torch.distributions.Categorical(logits=logits)
                 logp = dist.log_prob(a_b)
-                entropy = dist.entropy().mean() # entropy bonus for exploration
+                entropy = dist.entropy().mean()  # entropy bonus for exploration
 
                 # clipped surrogate loss
                 ratio = torch.exp(logp - logp_old_b)
@@ -279,7 +282,7 @@ class PPOAgent:
 
                 # Forwardpass Critic
                 values = self.critic(s_b).squeeze(-1)
-                value_loss = F.mse_loss(values, ret_b) # value function loss
+                value_loss = F.mse_loss(values, ret_b)  # value function loss
 
                 self.critic_optimizer.zero_grad()
                 (self.config.value_coef * value_loss).backward()
@@ -471,10 +474,7 @@ class PPOAgent:
             steps_this_update = self.config.horizon * self.config.num_envs
             total_env_training_steps += steps_this_update
             # Evaluation at fixed step intervals
-            if (
-                self.wandb
-                and total_env_training_steps >= next_evaluation_at_step
-            ):
+            if self.wandb and total_env_training_steps >= next_evaluation_at_step:
                 total_score = 0.0
                 runs = 10
                 for _ in range(runs):
@@ -482,14 +482,20 @@ class PPOAgent:
                     eval_ret = self.evaluate(eval_env)
                     total_score += eval_ret
                 eval_ret = total_score / runs
-                self.wandb.log({
-                    "eval/average_reward": eval_ret,
-                    "eval/total_training_steps": total_env_training_steps,
-                })
+                self.wandb.log(
+                    {
+                        "eval/average_reward": eval_ret,
+                        "eval/total_training_steps": total_env_training_steps,
+                    }
+                )
                 next_evaluation_at_step += EVAL_FREQUENCY_STEPS
 
             # 8. Checkpoint
-            run_id = self.wandb.id if self.wandb and hasattr(self.wandb, 'id') else "no_wandb"
+            run_id = (
+                self.wandb.id
+                if self.wandb and hasattr(self.wandb, "id")
+                else "no_wandb"
+            )
             if save_update and update % self.config.checkpoint_interval == 0:
                 self.checkpoint_manager.save_checkpoint(
                     self.actor,
@@ -529,6 +535,7 @@ class PPOAgent:
             final_model_filename,
         )
         return completed_returns
+
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create argument parser with PPOConfig defaults."""
@@ -606,6 +613,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     return p
 
+
 def set_random_seeds(seed: int) -> None:
     """Set random seeds for reproducibility."""
     np.random.seed(seed)
@@ -614,14 +622,20 @@ def set_random_seeds(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 def create_environment(config: PPOConfig, seed: int, render_mode: Optional[str] = None):
     """Create and validate environment."""
     try:
-        env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode=render_mode, seed=seed)
+        env = MediumDeliveryEnv(
+            map_config=MAIL_DELIVERY_MAPS[config.map_name],
+            render_mode=render_mode,
+            seed=seed,
+        )
         return env
     except Exception as e:
         logger.error(f"Failed to create environment: {e}")
         raise PPOError(f"Environment creation failed: {e}")
+
 
 def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.VectorEnv:
     """Return a SyncVectorEnv (1) or AsyncVectorEnv (≥2)."""
@@ -638,6 +652,7 @@ def make_vec_env(config: PPOConfig, num_envs: int, seed: int) -> gym.vector.Vect
     if num_envs == 1:
         return gym.vector.SyncVectorEnv(env_fns)
     return gym.vector.AsyncVectorEnv(env_fns)
+
 
 def main() -> None:
     """
@@ -680,9 +695,10 @@ def main() -> None:
         logger.info(
             f"Final 100-episode avg return: {np.mean(train_returns[-100:]):.2f}"
         )
-        
+
     wandb_run.finish()
     train_envs.close()
+
 
 if __name__ == "__main__":
     try:

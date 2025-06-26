@@ -1,46 +1,30 @@
 """
 PPO Hyperparameter Sweep Script using Weights & Biases (wandb)
 """
+
 import wandb
 import numpy as np
 import torch
 from ppo_agent import PPOConfig, PPOAgent, set_random_seeds, make_vec_env
 
+
 # Define the sweep configuration
 def get_sweep_config():
     return {
         "method": "bayes",
-        "metric": {
-            "name": "eval/average_reward",
-            "goal": "maximize"
-        },
+        "metric": {"name": "eval/average_reward", "goal": "maximize"},
         "parameters": {
-            "learning_rate": {
-                "values": [1e-4, 3e-4, 1e-3]
-            },
-            "batch_size": {
-                "values": [32, 64, 128]
-            },
-            "clip_range": {
-                "values": [0.1, 0.2, 0.3]
-            },
-            "gae_lambda": {
-                "values": [0.90, 0.95, 0.99]
-            },
-            "value_coef": {
-                "values": [0.25, 0.5, 1.0]
-            },
-            "entropy_coef": {
-                "values": [0.0, 0.01, 0.05]
-            },
-            "hidden_dim": {
-                "values": [32, 64, 128]
-            },
-            "seed": {
-                "values": [0, 42, 123]
-            },
-        }
+            "learning_rate": {"values": [1e-4, 3e-4, 1e-3]},
+            "batch_size": {"values": [32, 64, 128]},
+            "clip_range": {"values": [0.1, 0.2, 0.3]},
+            "gae_lambda": {"values": [0.90, 0.95, 0.99]},
+            "value_coef": {"values": [0.25, 0.5, 1.0]},
+            "entropy_coef": {"values": [0.0, 0.01, 0.05]},
+            "hidden_dim": {"values": [32, 64, 128]},
+            "seed": {"values": [0, 42, 123]},
+        },
     }
+
 
 def sweep_train():
     # Initialize wandb run and get the run object
@@ -73,6 +57,7 @@ def sweep_train():
     # Final average return
     if train_returns:
         wandb_run.log({"final_avg_return": np.mean(train_returns[-100:])})
+
 
 if __name__ == "__main__":
     sweep_config = get_sweep_config()

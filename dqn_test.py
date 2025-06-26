@@ -8,11 +8,16 @@ from maps import MAIL_DELIVERY_MAPS
 
 # Ignore all warnings
 import warnings
+
 warnings.filterwarnings("ignore")
 
+
 def create_environment(config: DQNConfig):
-    env = MediumDeliveryEnv(map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode="rgb_array")
+    env = MediumDeliveryEnv(
+        map_config=MAIL_DELIVERY_MAPS[config.map_name], render_mode="rgb_array"
+    )
     return env
+
 
 # Helper to load a trained DQN model
 def load_model(model_path: str, config: DQNConfig, device: torch.device):
@@ -22,10 +27,17 @@ def load_model(model_path: str, config: DQNConfig, device: torch.device):
     agent.model.eval()
     return agent
 
-def test_model(agent, env, device: torch.device, video_dir: str = None, video_name: str = None):
+
+def test_model(
+    agent, env, device: torch.device, video_dir: str = None, video_name: str = None
+):
     if video_dir:
-        env = RecordVideo(env, video_folder=video_dir, episode_trigger=lambda ep: True, 
-                          name_prefix=video_name if video_name else "dqn_test")
+        env = RecordVideo(
+            env,
+            video_folder=video_dir,
+            episode_trigger=lambda ep: True,
+            name_prefix=video_name if video_name else "dqn_test",
+        )
     obs_np, _ = env.reset()
     video_name = env._video_name
     # print(f"Observation space: x-{obs_np[0]:.4f}, y-{obs_np[1]:.4f}")
@@ -34,7 +46,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
     agent.epsilon = 0.0  # Greedy policy
     while not done:
         state = torch.from_numpy(np.asarray(obs_np, dtype=np.float32)).to(device)
-        if hasattr(agent, 'get_action'):
+        if hasattr(agent, "get_action"):
             action = agent.get_action(state.cpu().numpy())
         else:
             q_values = agent.model(state.unsqueeze(0))
@@ -48,6 +60,7 @@ def test_model(agent, env, device: torch.device, video_dir: str = None, video_na
     env.close()
     return total_reward, video_path
 
+
 def main():
     map = "default"
     trials = 50
@@ -60,10 +73,13 @@ def main():
     env = create_environment(config)
     agent = load_model(model_path, config, device)
     for i in range(1, trials + 1):
-        total_reward, video_path = test_model(agent, env, device, video_dir, video_name=f"{map}_{i}")
+        total_reward, video_path = test_model(
+            agent, env, device, video_dir, video_name=f"{map}_{i}"
+        )
         print(f"Test episode {i} reward: {total_reward}")
         if video_path:
             print(f"Video saved at: {video_path}")
+
 
 if __name__ == "__main__":
     main()

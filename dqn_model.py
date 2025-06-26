@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import os
 import numpy as np
 
+
 class Linear_QNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
@@ -16,13 +17,14 @@ class Linear_QNet(nn.Module):
         x = self.linear2(x)
         return x
 
-    def save(self, file_name='model.pth'):
-        model_folder_path = 'models/Gen2'
+    def save(self, file_name="model.pth"):
+        model_folder_path = "models/Gen2"
         if not os.path.exists(model_folder_path):
             os.makedirs(model_folder_path)
 
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
+
 
 class Linear_QNetGen2(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -35,12 +37,13 @@ class Linear_QNetGen2(nn.Module):
         x = self.linear2(x)
         return x
 
-    def save(self, file_name='model.pth'):
+    def save(self, file_name="model.pth"):
         # Ensure parent directory exists
         model_folder_path = os.path.dirname(file_name)
         if not os.path.exists(model_folder_path):
             os.makedirs(model_folder_path, exist_ok=True)
         torch.save(self.state_dict(), file_name)
+
 
 class Linear_QNetGen3(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -55,12 +58,13 @@ class Linear_QNetGen3(nn.Module):
         x = self.linear3(x)
         return x
 
-    def save(self, file_name='model.pth'):
+    def save(self, file_name="model.pth"):
         # Ensure parent directory exists
         model_folder_path = os.path.dirname(file_name)
         if not os.path.exists(model_folder_path):
             os.makedirs(model_folder_path, exist_ok=True)
         torch.save(self.state_dict(), file_name)
+
 
 class QTrainer:
     def __init__(self, model, lr, gamma):
@@ -78,7 +82,7 @@ class QTrainer:
             next_state = np.array(next_state)
             action = np.array(action)
             reward = np.array(reward)
-            
+
         Q_new = 0
         state = torch.tensor(state, dtype=torch.float)
         next_state = torch.tensor(next_state, dtype=torch.float)
@@ -90,7 +94,7 @@ class QTrainer:
             next_state = torch.unsqueeze(next_state, 0)
             action = torch.unsqueeze(action, 0)
             reward = torch.unsqueeze(reward, 0)
-            done = (done, )
+            done = (done,)
 
         # predicted Q values
         pred = self.model(state)
@@ -100,7 +104,9 @@ class QTrainer:
         for idx in range(len(done)):
             Q_new = reward[idx]
             if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                Q_new = reward[idx] + self.gamma * torch.max(
+                    self.model(next_state[idx])
+                )
             # print(target)
             target[idx][action[idx]] = Q_new
 
