@@ -42,6 +42,7 @@ dqn_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibilit
 # demonstrating the different enviornments
 ###
 def demo_best_agent_on_map(algorithm, map_name, video_dir='demo_videos', device='cpu'):
+    print(f"Running demo for {algorithm.upper()} on map '{map_name}'")
     env = Environment(
         render_mode='rgb_array', 
         map_config=MAPS[map_name],
@@ -55,12 +56,12 @@ def demo_best_agent_on_map(algorithm, map_name, video_dir='demo_videos', device=
     if algorithm == 'ppo':
         actor = ppo_test.load_model(checkpoint_path, env.observation_space.shape[0], env.action_space.n, device) 
         ppo_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
-        total_reward, video_path = ppo_test.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
+        total_reward, video_path = ppo_test.test_model(actor, env, device, video_dir=f'{video_dir}/fully_trained_map_{map_name}')
     else:
         config = dqn_test.DQNConfig(map_name=map_name)
         actor = dqn_test.load_model(checkpoint_path, config, device)
-        ppo_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
-        total_reward, video_path = dqn_test.test_model(actor, env, device, video_dir=f'{video_dir}/{algorithm}_demo_{map_name}')
+        dqn_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
+        total_reward, video_path = dqn_test.test_model(actor, env, device, video_dir=f'{video_dir}/fully_trained_map_{map_name}')
 
     # Test the model
     print(f"Total reward: {total_reward}")
@@ -114,7 +115,6 @@ map_name = 'default'  # Choose the map you want to evaluate on, can be 'default'
 ###
 
 # Create agent from scratch
-# TODO verify that optimal hyper parameters are already set in DQNConfig
 checkpoint_dir = f'demo_videos/checkpoints_dqn/{map_name}'
 config = dqn_agent.DQNConfig(map_name=map_name, 
                              seed=FIXED_SEED, 
@@ -144,7 +144,7 @@ actor = dqn_test.load_model(
 
 dqn_agent.set_random_seeds(FIXED_SEED)  # Set the random seed for reproducibility
 env = dqn_agent.create_environment(dqn_agent.DQNConfig(map_name=map_name, seed=FIXED_SEED), seed=FIXED_SEED, render_mode='rgb_array')
-video_dir = f'demo_videos/dqn_demo_{map_name}'  # Directory to save the video
+video_dir = f'demo_videos/shortly_trained_map_{map_name}'  # Directory to save the video
 
 
 # Test the model
@@ -173,7 +173,6 @@ Video(video_path, embed=True, width=800, height=600) if video_path else None
 ###
 
 # Init agent with the best hyper parameters.
-# TODO use optimal hyper parameters from the report
 # Switch to CPU to ensure determinism in the demo
 DEVICE = torch.device("cpu")  # Use CPU for this demo to ensure determinism
 config = ppo_agent.PPOConfig(map_name=map_name,
@@ -225,7 +224,7 @@ env = Environment(
 )
 
 print(f"Testing PPO agent on map '{map_name}'")
-video_dir = f'demo_videos/ppo_demo_{map_name}'  # Directory to save the video
+video_dir = f'demo_videos/shortly_trained_map_{map_name}'  # Directory to save the video
 # Test the model
 total_reward, video_path = ppo_test.test_model(
     actor,
