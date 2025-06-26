@@ -94,6 +94,4 @@ Heat-map PNGs are saved under sheatmap_results/<out>.
 
 # AI Disclaimer
 
-AI tools were used only to assist with:
-1. Debugging code-related issues
-2. Generating code snippets for graph visualization and plotting
+AI assistants _claude, chatgpt_ were utilized for debugging, code refinement, optimization, and annotation. However, no code was directly copied from a language model. Instead, multiple iterative prompts were used to debug, validate, and brainstorm ideas, combining lecture materials and our own ideas. Furthermore, LLMs were also utilized to assist in typesetting latex, paraphrasing, and grammar checking various sections of the report.
