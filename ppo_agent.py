@@ -54,7 +54,7 @@ class PPOConfig:
     # Architecture
     hidden_dim: int = 128
 
-    # optimization
+    # Optimization
     learning_rate: float = 1e-3  # Adam
     batch_size: int = 64  # per SGD minibatch
     n_epochs: int = 10  # PPO epochs per update
@@ -674,12 +674,13 @@ def main() -> None:
     # 4. Training loop
     train_returns = agent.train(train_envs)
 
+    # 5. Log final results
     logger.info("Training completed successfully!")
     if train_returns:
         logger.info(
             f"Final 100-episode avg return: {np.mean(train_returns[-100:]):.2f}"
         )
-
+        
     wandb_run.finish()
     train_envs.close()
 

@@ -56,7 +56,10 @@ def sweep_train():
         seed=config.seed,
     )
 
+    # Set random seeds for reproducibility
     set_random_seeds(dqn_config.seed)
+
+    # Train the DQN agent with the given configuration
     train(dqn_config, wandb_run=wandb_run)
 
 if __name__ == "__main__":

@@ -186,6 +186,7 @@ def evaluate_and_spatial_heatmap(
 # Main entry point
 # --------------------------------------------------------------------------- #
 
+
 def main():
     parser = argparse.ArgumentParser(description="Visualise PPO spatial heat-map")
     parser.add_argument(
