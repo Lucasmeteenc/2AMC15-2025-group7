@@ -16,7 +16,7 @@ import random
 from collections import deque
 import wandb
 
-from model_custom_dqn import Linear_QNetGen2, QTrainer
+from dqn_model import Linear_QNetGen2, QTrainer
 from environments.medium_delivery_env import MediumDeliveryEnv
 from maps import MAIL_DELIVERY_MAPS
 
