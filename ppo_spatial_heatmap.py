@@ -230,7 +230,7 @@ def main():
     parser.add_argument(
         "--bw",
         type=float,
-        default=0.5,
+        default=0.3,
         help="Bandwidth scaling for KDE (lower = hugs path)",
     )
     parser.add_argument(
