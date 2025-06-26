@@ -6,3 +6,9 @@ flask-socketio >= 5.3
 pillow >= 9.4
 colorcet >=3.0
 filelock >=3.0
+ipython >= 8.0
+wandb
+torch >= 2.0
+gymnasium[other]
+seaborn  
+matplotlib  
