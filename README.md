@@ -226,6 +226,31 @@ The parameters are set and can be modified inside the 'main()' function.
 
 # Ablation study 
 
+The ablation study explored the algorithms' performance on two maps, the `default` and the `inside`, using either 1 or 10 rays.
+
+In order to reproduce the results: 
+- modify the files `dqn_agent.py` and `ppo_agent.py` by trying both `inside` and `default` values of the `--map-name` parameter. 
+- modify the file `medium_delivery_env.py` by changing the `nr_rays` variable from `10` to `1`.
+
+1. Change the map used for training:
+   - Modify the `--map-name` argument in both `dqn_agent.py` and `ppo_agent.py`:
+     ```bash
+     --map-name='default'
+     --map-name='inside'
+     ```
+
+2. Change the number of rays used in the environment:
+   - Open the file `medium_delivery_env.py`
+   - Locate the `nr_rays` variable and update it:
+     ```python
+     nr_rays = 1  # Change from 10 to 1
+     ```
+
+Run the training scripts with all combinations of:
+- `--map-name` values: `default`, `inside`
+- `nr_rays`: `10` and `1`
+
+
 # Sweeps
 
 # Environment
