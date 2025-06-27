@@ -142,8 +142,11 @@ The script:
 
 The default parameters were selected based on the best-performing results from the hyperparameter sweeps.
 
-### Example run: PPO Training using the best identified hyperparameters
+### Example run: PPO Training using the best identified hyperparameters on the 'default' map
 - python ppo_agent.py
+
+### Example run: PPO Training on the 'inside' map
+- python ppo_agent.py --map-name='inside'
 
 
 ## PPO Testing
@@ -204,8 +207,11 @@ The script:
 
 The default parameters were selected based on the best-performing results from the hyperparameter sweeps.
 
-### Example run: DQN Training using the best identified hyperparameters
+### Example run: DQN Training using the best identified hyperparameters on the 'default' map
 - python dqn_agent.py
+
+### Example run: DQN Training on the more complex 'inside' map
+- python dqn_agent.py --map-name='inside'
 
 
 ## DQN Testing
