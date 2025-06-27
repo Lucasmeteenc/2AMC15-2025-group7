@@ -92,6 +92,86 @@ python ppo_spatial_heatmap.py [--model PATH] [--map NAME] [--trials N]
 Heat-map PNGs are saved under sheatmap_results/<out>.
 
 
+# PPO Agent
+
+The Proximal Policy Optimization (PPO) implementation is structured across the following files:
+
+| File Name         | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+|  `ppo_network.py`  | Defines the actor and critic neural networks used in PPO.                   |
+| `ppo_utils.py`    | Provides utility functions such as Generalized Advantage Estimation (GAE) and logging. |
+| `ppo_agent.py`    | Implements the PPO algorithm and the training process.                         |
+
+## PPO Training
+
+### Script: `ppo_agent.py`
+
+The script: 
+- Parses training arguments
+- Sets random seeds and training environment
+- Initializes the PPO agent
+- Trains the agent
+- Saves the logs and model parameters
+
+### PPO Training Parameters
+
+| Argument                | Type    | Default        | Description |
+|-------------------------|---------|----------------|-------------|
+| `--num-envs`            | `int`   | `8`            | Number of parallel environments used during training. |
+| `--horizon`             | `int`   | `2_048`         | Number of steps per environment before each PPO update. |
+| `--total-timesteps`     | `int`   | `2_000_000`    | Total number of environment steps to train for. |
+| `--hidden-dim`          | `int`   | `128`           | Width of each fully connected hidden layer in the networks. |
+| `--learning-rate`       | `float` | `1e-3`       | Learning rate for the optimizer. |
+| `--batch-size`          | `int`   | `64`           | Minibatch size for PPO updates. |
+| `--n-epochs`            | `int`   | `10`           | Number of training epochs per PPO update. |
+| `--clip-range`          | `float` | `0.1`          | Clipping range (epsilon) for the PPO objective. |
+| `--gamma`               | `float` | `0.99`         | Discount factor for future rewards. |
+| `--gae-lambda`          | `float` | `0.9`         | Lambda parameter for Generalized Advantage Estimation (GAE). |
+| `--value-coef`          | `float` | `1`          | Weight of value function loss in the total loss. |
+| `--entropy-coef`        | `float` | `0.0`         | Weight of entropy bonus to encourage exploration. |
+| `--max-grad-norm`       | `float` | `0.5`          | Maximum gradient norm for clipping (stabilizes training). |
+| `--use-gae`             | `bool`  | `True`         | Whether to use GAE for advantage estimation. |
+| `--seed`                | `int`   | `0`           | Random seed for reproducibility. |
+| `--log-interval`        | `int`   | `1`           | Log training metrics every N updates. |
+| `--checkpoint-interval` | `int`   | `1`          | Save model checkpoint every N updates. |
+| `--log-window`          | `int`   | `100`           | Rolling window size for smoothing log metrics. |
+| `--log-dir`             | `str`   | `"logs"`      | Directory to save training logs. |
+| `--checkpoint-dir`      | `str`   | `"checkpoints_ppo"` | Directory to save model checkpoints. |
+| `--video-dir`           | `str`   | `"videos"`    | Directory to store evaluation videos. |
+| `--map-name`            | `str`   | `"default"`  | Environment map name for the training scenario. Other values "inside", "empty"|
+
+### Example run PPO Training
+- python ppo_agent.py
+- python ppo_agent.py --total-timesteps=2000000 --horizon=4096
+
+## PPO Testing
+
+### Script: `ppo_test.py`
+
+The script: 
+- Loads a saved model
+- Runs multiple test episodes for the specified environment
+- Records and saves videos
+
+### PPO Test Parameters
+
+The parameters are set and can be modified inside the 'main()' function.
+
+| Parameter   | Type   | Default                                      | Description                                         |
+|-------------|--------|----------------------------------------------|-----------------------------------------------------|
+| `map`       | string | `"default"`                                  | Environment map name for the training scenario. Other values "inside", "empty" |
+| `trials`    | int    | `10`                                         | Number of test episodes to run.                      |
+| `model_path`| string | `"checkpoints_ppo/final_model_default.pth"` | Path to the saved PPO model checkpoint file.        |
+| `video_dir` | string | `"videos/test_videos_ppo_{map}"`           | Directory where test videos will be saved.           |
+
+# DQN Agent
+
+## DQN Training
+
+## DQN Testing
+
+# Ablation study 
+
 # AI Disclaimer
 
 AI assistants _claude, chatgpt_ were utilized for debugging, code refinement, optimization, and annotation. However, no code was directly copied from a language model. Instead, multiple iterative prompts were used to debug, validate, and brainstorm ideas, combining lecture materials and our own ideas. Furthermore, LLMs were also utilized to assist in typesetting latex, paraphrasing, and grammar checking various sections of the report.
