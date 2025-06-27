@@ -140,9 +140,11 @@ The script:
 | `--video-dir`           | `str`   | `"videos"`    | Directory to store evaluation videos. |
 | `--map-name`            | `str`   | `"default"`  | Environment map name for the training scenario. Other values "inside", "empty".|
 
-### Example run PPO Training
+The default parameters were selected based on the best-performing results from the hyperparameter sweeps.
+
+### Example run: PPO Training using the best identified hyperparameters
 - python ppo_agent.py
-- python ppo_agent.py --total-timesteps=2000000 --horizon=4096
+
 
 ## PPO Testing
 
@@ -200,9 +202,11 @@ The script:
 | `--seed`             | `int`  | `0`           | Random seed for reproducibility.                |
 | `--map-name`         | `str`  | `default`       | Environment map name for the training scenario. Other values "inside", "empty".  |
 
-### Example run DQN Training
+The default parameters were selected based on the best-performing results from the hyperparameter sweeps.
+
+### Example run: DQN Training using the best identified hyperparameters
 - python dqn_agent.py
-- python dqn_agent.py --total-episodes=30_000 --batch-size=32
+
 
 ## DQN Testing
 
@@ -253,7 +257,11 @@ Run the training scripts with all combinations of:
 
 # Sweeps
 
+The scripts `ppo_sweep.py` and `dqn_sweep.py` perform hyperparameter sweeps for the agents using Weights & Biases.
+
 # Environment
+
+The environment used for assessing the algorithms' performance is `medium_delivery_env.py` located in the `environments` folder. Specifically, the environment simulates a delivery robot in a continuous state space that has to pick up and deliver a package while avoiding obstacles using discrete actions and lidar-based perception.
 
 # AI Disclaimer
 
