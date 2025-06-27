@@ -138,7 +138,7 @@ The script:
 | `--log-dir`             | `str`   | `"logs"`      | Directory to save training logs. |
 | `--checkpoint-dir`      | `str`   | `"checkpoints_ppo"` | Directory to save model checkpoints. |
 | `--video-dir`           | `str`   | `"videos"`    | Directory to store evaluation videos. |
-| `--map-name`            | `str`   | `"default"`  | Environment map name for the training scenario. Other values "inside", "empty"|
+| `--map-name`            | `str`   | `"default"`  | Environment map name for the training scenario. Other values "inside", "empty".|
 
 ### Example run PPO Training
 - python ppo_agent.py
@@ -166,11 +166,69 @@ The parameters are set and can be modified inside the 'main()' function.
 
 # DQN Agent
 
+The Deep Q-Learning (DQN) implementation is structured across the following files:
+
+| File Name         | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+|  `dqn_model.py`  | Defines the DQN architecture.                 |
+| `dqn_agent.py`    | Implements the DQN algorithm and the training process.                         |
+
 ## DQN Training
+
+### Script: `dqn_agent.py`
+
+The script: 
+- Parses training arguments
+- Sets random seeds and training environment
+- Initializes the DQN agent
+- Trains the agent
+- Saves the logs and model parameters
+
+| Argument             | Type   | Default Value           | Description                                      |
+|----------------------|--------|--------------------------|--------------------------------------------------|
+| `--total-episodes`   | `int`  | `15_000` | Total number of training episodes.              |
+| `--batch-size`       | `int`  | `64`     | Batch size for sampling from replay memory.     |
+| `--memory-size`      | `int`  | `200_000`    | Maximum size of the replay memory buffer.       |
+| `--learning-rate`    | `float`| `0.0001`  | Learning rate for the optimizer.                |
+| `--gamma`            | `float`| `0.99`          | Discount factor for future rewards.             |
+| `--epsilon-start`    | `float`| `1.0`  | Initial epsilon value for exploration.          |
+| `--epsilon-end`      | `float`| `0.01`    | Final epsilon value after decay.                |
+| `--epsilon-decay`    | `float`| `0.999`  | Rate of epsilon decay per episode.              |
+| `--hidden-dim`       | `int`  | `256`     | Size of hidden layers in the Q-network.         |
+| `--checkpoint-dir`   | `str`  | `"checkpoints_dqn"` | Directory to save model checkpoints.            |
+| `--log-interval`     | `int`  | `10`   | Interval (in episodes) for logging stats.       |
+| `--seed`             | `int`  | `0`           | Random seed for reproducibility.                |
+| `--map-name`         | `str`  | `default`       | Environment map name for the training scenario. Other values "inside", "empty".  |
+
+### Example run DQN Training
+- python dqn_agent.py
+- python dqn_agent.py --total-episodes=30_000 --batch-size=32
 
 ## DQN Testing
 
+### Script: `dqn_test.py`
+
+The script: 
+- Loads a saved model
+- Runs multiple test episodes for the specified environment
+- Records and saves videos
+
+### DQN Test Parameters
+
+The parameters are set and can be modified inside the 'main()' function.
+
+| Parameter   | Type   | Default                                      | Description                                         |
+|-------------|--------|----------------------------------------------|-----------------------------------------------------|
+| `map`       | string | `"default"`                                  | Environment map name for the training scenario. Other values "inside", "empty" |
+| `trials`    | int    | `50`                                         | Number of test episodes to run.                      |
+| `model_path`| string | `"checkpoints_dqn/final_model_default.pth"` | Path to the saved DQN model checkpoint file.        |
+| `video_dir` | string | `"videos/test_videos_dqn_{map}"`           | Directory where test videos will be saved.           |
+
 # Ablation study 
+
+# Sweeps
+
+# Environment
 
 # AI Disclaimer
 
