@@ -241,6 +241,7 @@ class PPOAgent:
         # Advantage normalisation (recommended in PPO paper appendix)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
+        # Creating data loader for the provided states each training step
         dataset = TensorDataset(states, actions, logp_old, advantages, returns)
         loader = DataLoader(
             dataset, batch_size=self.config.batch_size, shuffle=True, drop_last=True
@@ -253,6 +254,7 @@ class PPOAgent:
         n_minibatch = self.config.n_epochs * len(loader)
         clip_eps = self.config.clip_range
 
+        # Training loop updating the policy based on the provided states and rewards
         for _ in range(self.config.n_epochs):
             for s_b, a_b, logp_old_b, adv_b, ret_b in loader:
                 # detach minibatch views
@@ -457,6 +459,8 @@ class PPOAgent:
                     self.actor_optimizer.param_groups[0]["lr"],
                     self.critic_optimizer.param_groups[0]["lr"],
                 )
+            # Updating WandB
+            # Logging the statistics of the current update
             if self.wandb and update % self.config.log_interval == 0:
                 steps_per_update = self.config.horizon * self.config.num_envs
                 self.wandb.log(
@@ -524,7 +528,7 @@ class PPOAgent:
                     )
                     break
 
-        # final save
+        # Save final model
         final_model_filename = f"final_model_{run_id}.pth"
         self.checkpoint_manager.save_checkpoint(
             self.actor,
